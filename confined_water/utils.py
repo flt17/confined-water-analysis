@@ -14,9 +14,9 @@ def get_path_to_file(directory_path, file_suffix=None, file_prefix=None):
     """
     Return the path to file based on given directory and suffix and if given prefix.
     Arguments:
-        directory_path: The path to the directory containing the trajectory.
-        file_suffix: The general suffix or type of the file.
-        file_prefix: The general name of the file.
+        directory_path (str): The path to the directory containing the trajectory.
+        file_suffix (str): The general suffix or type of the file.
+        file_prefix (str): The general name of the file.
     Returns:
         path_to_file: The path to the requested file.
     """
@@ -46,9 +46,9 @@ def get_ase_atoms_object(pdb_file_path):
     a lammpstrj file with the same name in the same
     directory.
     Arguments:
-        pdb_file_path: The path to the pdb file.
+        pdb_file_path (str): The path to the pdb file.
     Returns:
-        ase_AO : The ase atoms object.
+        ase_AO (object): The ase atoms object.
     """
 
     try:

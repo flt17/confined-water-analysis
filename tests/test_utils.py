@@ -3,7 +3,7 @@ import sys
 from unittest import mock
 
 sys.path.append("../")
-from confined_water_analysis import utils
+from confined_water import utils
 
 
 class TestGetPathToFile:
