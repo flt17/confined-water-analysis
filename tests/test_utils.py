@@ -14,13 +14,29 @@ class TestGetPathToFile:
         with pytest.raises(utils.UnableToFindFile):
             utils.get_path_to_file(path, suffix)
 
-    def test_returns_first_file(self):
+    def test_returns_all_files_with_same_suffix(self):
         path = "./files"
         suffix = "pdb"
 
-        file_name = utils.get_path_to_file(path, suffix)
+        file_names = utils.get_path_to_file(path, suffix)
 
-        assert file_name == "./files/PBE-D3-cnt-w65-T330-1bar.pdb"
+        assert file_names == [
+            "./files/PBE-D3-bnnt-w68-T330K-1bar.pdb",
+            "./files/PBE-D3-cnt-w65-T330K-1bar.pdb",
+            "./files/revPBE0-D3-w64-T300K-1bar.pdb",
+        ]
+
+    def test_returns_all_files_containing_similar_prefix(self):
+        path = "./files"
+        suffix = "pdb"
+        prefix = "T330K"
+
+        file_names = utils.get_path_to_file(path, suffix, prefix, exact_match=False)
+
+        assert file_names == [
+            "./files/PBE-D3-bnnt-w68-T330K-1bar.pdb",
+            "./files/PBE-D3-cnt-w65-T330K-1bar.pdb",
+        ]
 
     def test_returns_requested_file(self):
         path = "./files"

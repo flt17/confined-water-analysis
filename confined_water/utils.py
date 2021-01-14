@@ -5,40 +5,51 @@ import ase
 from ase import io
 from ase.io import lammpsrun
 
+import MDAnalysis as mdanalysis
+
 
 class UnableToFindFile(Exception):
     pass
 
 
-def get_path_to_file(directory_path, file_suffix=None, file_prefix=None):
+class UndefinedOption(Exception):
+    pass
+
+
+def get_path_to_file(directory_path: str, file_suffix=None, file_prefix=None, exact_match=True):
     """
     Return the path to file based on given directory and suffix and if given prefix.
     Arguments:
         directory_path (str): The path to the directory containing the trajectory.
         file_suffix (str): The general suffix or type of the file.
         file_prefix (str): The general name of the file.
+        exact_match (bool): Determines whether file_prefix needs to be matched exactly or partially.
     Returns:
-        path_to_file: The path to the requested file.
+        path_to_file (str): The path to the requested file(s).
     """
     files_in_path = sorted(glob.glob(os.path.join(directory_path, f"*.{file_suffix}")))
 
     if not files_in_path:
         raise UnableToFindFile(f"No {file_suffix} file found in path {directory_path}.")
 
-    # If prefix of file is given, we take that file.
+    # If prefix of file is given...
     if file_prefix:
-        return [file for file in files_in_path if file_prefix + f".{file_suffix}" in file][0]
-    # Otherwise, we take the first file given by alphabetical order.
+        # ... and exact matching is asked we return exactly that file
+        if exact_match:
+            expected_path = os.path.join(directory_path, file_prefix + f".{file_suffix}")
+            return [file for file in files_in_path if file == expected_path][0]
+        # If exact_matching is false all files comprising file_prefix in the file name are returned
+        else:
+            return [file for file in files_in_path if file_prefix in file]
+
+    # Otherwise, we take return all files in alphabetical order.
     else:
         if len(files_in_path) > 1:
-            file_name_found = files_in_path[0].split("/")[-1]
-            print(
-                f"WARNING: More than one {file_suffix} file found. Proceeding with {file_name_found}."
-            )
-        return files_in_path[0]
+            print(f"WARNING: More than one {file_suffix} file found.")
+        return files_in_path
 
 
-def get_ase_atoms_object(pdb_file_path):
+def get_ase_atoms_object(pdb_file_path: str):
     """
     Return an ase atoms object used for topology.
     This happens via the previously found pdb-file.
@@ -100,5 +111,16 @@ def get_mdanalysis_universe(directory_path: str, universe_type="positions"):
 
     print(f"Using the topology from {topology_file}.")
 
-    # Look for trajectory (dcd) files, could be more than one if PIMD was performed
-    trajectory_files = get_path_to_file(directory_path, "dcd")
+    # Determine trajectory filenames
+    trajectory_prefix = dictionary_trajectory_files.get(universe_type)
+    if not trajectory_prefix:
+        raise UndefinedOption(
+            f"Specified {universe_type} is unknown. Possible options are {dictionary_trajectory_files.keys()}"
+        )
+
+    # Look for trajectory (dcd) files , could be more than one if PIMD was performed
+    trajectory_files = get_path_to_file(directory_path, "dcd", trajectory_prefix, exact_match=False)
+
+    print(f"Creating universes for {len(trajectory_files)} trajectories.")
+
+    return mdanalysis.Universe(topology_file, trajectory_files)
