@@ -75,3 +75,30 @@ def get_ase_atoms_object(pdb_file_path):
         ase_AO.set_chemical_symbols(["C"] * ase_AO.get_global_number_of_atoms())
 
         return ase_AO
+
+
+def get_mdanalysis_universe(directory_path: str, universe_type="positions"):
+    """
+    Return an mdanalysis universe object based on a given trajectory. This will be done by
+    first finding the correct topology file (e.g. pdb) and coupling it with a dcd file.
+
+    Arguments:
+        directory_path (str): The path to the directory in which the simulation was performed.
+        universe_type (str): Which kind of universe type (positions, forces, velocities) should
+                             be created.
+
+    Returns:
+        mdanalysis_universe (object): The mdanalsysis universe object.
+    """
+
+    # Link universe_type to file names of respective trajectories via dictionary
+    # Currently, only supports default of CP2K
+    dictionary_trajectory_files = {"positions": "pos", "velocities": "vel", "forces": "frc"}
+
+    # Look for topology file (only pdb supported) in same directory
+    topology_file = get_path_to_file(directory_path, "pdb")
+
+    print(f"Using the topology from {topology_file}.")
+
+    # Look for trajectory (dcd) files, could be more than one if PIMD was performed
+    trajectory_files = get_path_to_file(directory_path, "dcd")

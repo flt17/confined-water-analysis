@@ -8,15 +8,13 @@ class ConfinedWaterSystem:
 
     """
 
-    def __init__(self, directory_path, name):
+    def __init__ (self, name: str ):
 
    	"""
     Arguments:
     	name (str) :  The name of the instance of the class.
-        directory_path (str) : The path to the directory containing the trajectory.
     """
 
         self.name = name
-        self.directory_path = directory_path
 
 
