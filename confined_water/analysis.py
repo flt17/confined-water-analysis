@@ -58,12 +58,15 @@ class Simulation:
 
         self.directory_path = directory_path
 
-    def read_in_simulation_data(self, read_positions: bool = True):
+    def read_in_simulation_data(
+        self, read_positions: bool = True, read_summed_forces: bool = False
+    ):
 
         """
         Setup all selected simulation data.
         Arguments:
             read_positions (bool) : Whether to read in position trajectories.
+            read_summed_forces (bool) : Whether to read in separately printed summed forces.
 
         Returns:
 

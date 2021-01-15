@@ -21,4 +21,4 @@ class TestConfinedWaterSystemAddSimulation:
         bulk_water = analysis.ConfinedWaterSystem("Bulk Water")
         bulk_water.add_simulation("PIMD", path)
 
-        assert bulk_water.simulations.get("PIMD")
+        assert isinstance(bulk_water.simulations.get("PIMD"), analysis.Simulation)
