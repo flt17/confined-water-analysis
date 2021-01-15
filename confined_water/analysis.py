@@ -19,8 +19,25 @@ class ConfinedWaterSystem:
         """
         Arguments:
           name (str) :  The name of the instance of the class.
+          simulations (dictonary) : Dictionary of all simulations performed on the given system
+                                    labelled by user-given names.
         """
         self.name = name
+        self.simulations = {}
+
+    def add_simulation(self, simulation_name: str, directory_path: str):
+        """
+        Initialise instance of Simulation class with given name and directory path and add
+        it ot the simulation dictionary.
+        Arguments:
+            simulation_name (str) : Name which will be used in a dictionary to access the
+                                computed properties and raw data.
+            directory path (str) :  Path to the simulation directory.
+        Returns:
+
+        """
+
+        self.simulations[simulation_name] = Simulation(directory_path)
 
 
 class Simulation:
@@ -33,10 +50,10 @@ class Simulation:
 
     """
 
-    def __init__(self, directory_path):
+    def __init__(self, directory_path: str):
         """
         Arguments:
-            path (str) :  Path to the simulation directory.
+            directory path (str) :  Path to the simulation directory.
         """
 
         self.directory_path = directory_path
