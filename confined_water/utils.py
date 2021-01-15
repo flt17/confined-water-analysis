@@ -16,7 +16,9 @@ class UndefinedOption(Exception):
     pass
 
 
-def get_path_to_file(directory_path: str, file_suffix=None, file_prefix=None, exact_match=True):
+def get_path_to_file(
+    directory_path: str, file_suffix: str = None, file_prefix: str = None, exact_match: str = True
+):
     """
     Return the path to file based on given directory and suffix and if given prefix.
     Arguments:
@@ -88,7 +90,9 @@ def get_ase_atoms_object(pdb_file_path: str):
         return ase_AO
 
 
-def get_mdanalysis_universe(directory_path: str, universe_type="positions"):
+def get_mdanalysis_universe(
+    directory_path: str, universe_type: str = "positions", topology_file_prefix: str = None
+):
     """
     Return an mdanalysis universe object based on a given trajectory. This will be done by
     first finding the correct topology file (e.g. pdb) and coupling it with a dcd file.
@@ -96,18 +100,22 @@ def get_mdanalysis_universe(directory_path: str, universe_type="positions"):
     Arguments:
         directory_path (str): The path to the directory in which the simulation was performed.
         universe_type (str): Which kind of universe type (positions, forces, velocities) should
-                             be created.
+                             be created. So far, only positions are implemented as the velocity and
+                             force-dcd files need to be converted.
+        topology_file_prefix (str): General name of pdb file. Only exact matching implemented here.
 
     Returns:
-        mdanalysis_universe (object): The mdanalsysis universe object.
+        mdanalysis_universe (object): The mdanalsysis universe object(s) dependent on the number of
+                                     trajectories found. If PIMD the first element contains the centroid
+                                     and the second one the concatenated beats of the ring polymer.
     """
 
     # Link universe_type to file names of respective trajectories via dictionary
     # Currently, only supports default of CP2K
     dictionary_trajectory_files = {"positions": "pos", "velocities": "vel", "forces": "frc"}
 
-    # Look for topology file (only pdb supported) in same directory
-    topology_file = get_path_to_file(directory_path, "pdb")
+    # Look for topology file (only pdb supported) in same directory, only exact matching implemented for prefix
+    topology_file = get_path_to_file(directory_path, "pdb", topology_file_prefix)
 
     print(f"Using the topology from {topology_file}.")
 
@@ -123,4 +131,21 @@ def get_mdanalysis_universe(directory_path: str, universe_type="positions"):
 
     print(f"Creating universes for {len(trajectory_files)} trajectories.")
 
-    return mdanalysis.Universe(topology_file, trajectory_files)
+    if len(trajectory_files) == 1:
+        # If only one trajectory file was found, this is a classical simulation
+        return mdanalysis.Universe(topology_file, trajectory_files)
+
+    else:
+        # If multiple files were found,this is a PIMD simulation
+        # In this case we generate multiple Universes, one for each beat
+        # for calculating statical and thermodynamical properties as well
+        # as the centroid universe which should be used for dynamical properties.
+
+        # This requires that the first file is the centroid trajectory. This is automatically guaranteed
+        # by using CP2K to run the PIMD simulations which uses "*centroid*" and "*pos*"/"*vel*"/"*frc*"
+        # as part of the file names
+        centroid_universe = mdanalysis.Universe(topology_file, trajectory_files[0])
+        beat_universes = [
+            mdanalysis.Universe(topology_file, traj_file) for traj_file in trajectory_files[1::]
+        ]
+        return [centroid_universe, *beat_universes]
