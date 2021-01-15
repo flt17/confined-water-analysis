@@ -48,7 +48,9 @@ def get_path_to_file(
     else:
         if len(files_in_path) > 1:
             print(f"WARNING: More than one {file_suffix} file found.")
-        return files_in_path
+            return files_in_path
+        else:
+            return files_in_path[0]
 
 
 def get_ase_atoms_object(pdb_file_path: str):
@@ -65,6 +67,7 @@ def get_ase_atoms_object(pdb_file_path: str):
     """
 
     try:
+
         # Try to use pdb file to generate atoms object
         return ase.io.read(pdb_file_path)
 
@@ -107,7 +110,7 @@ def get_mdanalysis_universe(
     Returns:
         mdanalysis_universe (object): The mdanalsysis universe object(s) dependent on the number of
                                      trajectories found. If PIMD the first element contains the centroid
-                                     and the second one the concatenated beats of the ring polymer.
+                                     followed by individual beats of the ring polymer.
     """
 
     # Link universe_type to file names of respective trajectories via dictionary
