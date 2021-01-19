@@ -64,7 +64,10 @@ class Simulation:
         self.radial_distribution_functions = {}
 
     def read_in_simulation_data(
-        self, read_positions: bool = True, read_summed_forces: bool = False
+        self,
+        read_positions: bool = True,
+        read_summed_forces: bool = False,
+        topology_file_name: str = None,
     ):
 
         """
@@ -72,6 +75,7 @@ class Simulation:
         Arguments:
             read_positions (bool) : Whether to read in position trajectories.
             read_summed_forces (bool) : Whether to read in separately printed summed forces.
+            topology_file_name (str) : Name of the topology file (currently only pdb). If not given, first file taken.
 
         Returns:
 
@@ -85,7 +89,9 @@ class Simulation:
         # Trajectory, can be one ore multiple. If more than one, first element is centroid.
         # Functions which compute a specific property will choose which universe is picked in case of PIMD.
         if read_positions:
-            universes = utils.get_mdanalysis_universe(self.directory_path, "positions")
+            universes = utils.get_mdanalysis_universe(
+                self.directory_path, "positions", topology_file_name
+            )
 
             # to make sure self.position_universes is always a list of MDAnalysis Universes
             self.position_universes = (
