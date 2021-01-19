@@ -124,3 +124,30 @@ class Simulation:
         print(f"End time: \t \t{self.end_time} \t fs")
         print(f"Time between frames: \t{self.time_between_frames} \t fs")
         print(f"Frame frequency: \t{self.frame_frequency}")
+
+    def _get_sampling_frames(
+        self, start_time: int = None, end_time: int = None, frame_frequency: int = None
+    ):
+        """
+        Determine sampling frames from given sampling times.
+        Arguments:
+            start_time (int) : Start time for analysis.
+            end_time (int) : End time for analysis.
+            frame_frequency (int): Take every nth frame only.
+        Returns:
+            start_frame (int) : Start frame for analysis.
+            end_frame (int) : End frame for analysis.
+            frame_frequency (int): Take every nth frame only.
+
+        """
+        start_time = start_time if start_time is not None else self.start_time
+        end_time = end_time if end_time is not None else self.end_time
+
+        frame_frequency = int(
+            frame_frequency if frame_frequency is not None else self.frame_frequency
+        )
+
+        start_frame = int(start_time / self.time_between_frames)
+        end_frame = int(end_time / self.time_between_frames)
+
+        return start_frame, end_frame, frame_frequency
