@@ -7,6 +7,10 @@ sys.path.append("../")
 from confined_water import utils
 
 
+class KeyNotFound(Exception):
+    pass
+
+
 class ConfinedWaterSystem:
     """
     Gather computed properties from simulations for easy comparison.
@@ -125,7 +129,7 @@ class Simulation:
             time_between_frames if time_between_frames is not None else self.time_between_frames
         )
 
-        total_time = (self.position_universes[0].nframes - 1) * self.time_between_frames
+        total_time = (self.position_universes[0].trajectory.n_frames - 1) * self.time_between_frames
         self.end_time = (
             total_time if end_time == -1 else end_time if end_time is not None else self.end_time
         )
@@ -213,6 +217,12 @@ class Simulation:
             if len(self.position_universes) == 1
             else self.position_universes[1::]
         )
+
+        # check whether chosen species are found in universe
+        species_in_system = np.unique(tmp_position_universes)
+
+        if species_1 not in species_in_system or species_2 not in species_in_system:
+            raise KeyNotFound(f"At least on of the species specified is not in the system.")
 
         rdfs_sampled = []
         # loop over all universes

@@ -32,3 +32,20 @@ class TestConfinedWaterSystemAddSimulation:
         bulk_water.add_simulation("PIMD", path)
 
         assert isinstance(bulk_water.simulations.get("PIMD"), analysis.Simulation)
+
+
+class TestSimulationComputeRDF:
+    def test_raises_error_when_species_not_found(self):
+        path = "./files/bulk_water/classical"
+
+        topology_name = "revPBE0-D3-w64-T300K-1bar"
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True, topology_file_name=topology_name)
+
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+
+        with pytest.raises(analysis.KeyNotFound):
+            simulation.compute_rdf("O", "X")
