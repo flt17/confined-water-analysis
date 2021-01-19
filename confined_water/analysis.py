@@ -81,7 +81,7 @@ class Simulation:
 
         """
         # setup topology based on only pdb file in directoy
-        path_to_topology = utils.get_path_to_file(self.directory_path, "pdb")
+        path_to_topology = utils.get_path_to_file(self.directory_path, "pdb", topology_file_name)
         self.topology = utils.get_ase_atoms_object(path_to_topology)
 
         # Read in what needs to be read in (right now via if loop)
@@ -95,7 +95,7 @@ class Simulation:
 
             # to make sure self.position_universes is always a list of MDAnalysis Universes
             self.position_universes = (
-                universes if isinstance(universes, list) == list else [universes]
+                universes if isinstance(universes, list) == True else [universes]
             )
 
     def set_sampling_times(

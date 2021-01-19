@@ -11,7 +11,17 @@ class TestSimulationReadInSimulationData:
         pimd_simulation = analysis.Simulation(path)
 
         pimd_simulation.read_in_simulation_data(read_positions=True)
+
         assert len(pimd_simulation.position_universes) == 5
+
+    def test_sets_up_position_universes_with_multiple_pdbs_in_directory(self):
+        path = "./files/bulk_water/classical"
+        topology_name = "revPBE0-D3-w64-T300K-1bar"
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True, topology_file_name=topology_name)
+
+        assert len(simulation.position_universes) == 1
 
 
 class TestConfinedWaterSystemAddSimulation:
