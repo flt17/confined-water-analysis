@@ -1,4 +1,7 @@
+import numpy as np
 import sys
+
+import MDAnalysis.analysis.rdf as mdanalysis_rdf
 
 sys.path.append("../")
 from confined_water import utils
@@ -57,6 +60,8 @@ class Simulation:
         """
 
         self.directory_path = directory_path
+
+        self.radial_distribution_functions = {}
 
     def read_in_simulation_data(
         self, read_positions: bool = True, read_summed_forces: bool = False
@@ -151,3 +156,84 @@ class Simulation:
         end_frame = int(end_time / self.time_between_frames)
 
         return start_frame, end_frame, frame_frequency
+
+    def compute_rdf(
+        self,
+        species_1: str,
+        species_2: str,
+        spatial_range: float = None,
+        spatial_resolution: int = None,
+        start_time: int = None,
+        end_time: int = None,
+        frame_frequency: int = None,
+    ):
+        """
+        Compute radial distribution function for given species.
+        Arguments:
+            species_1 (str) : Name of species (element) used here.
+            species_2 (str) : Name of species (element) used here
+            spatial_range (float) : Spatial expansion of the rdf computed (optional)
+            spatial_resolution (int) : Number of bins for histogram generated (optional).
+            start_time (int) : Start time for analysis (optional).
+            end_time (int) : End time for analysis (optional).
+            frame_frequency (int): Take every nth frame only (optional).
+        Returns:
+
+        """
+
+        # get information about sampling either from given arguments or previously set
+        start_frame, end_frame, frame_frequency = self._get_sampling_frames(
+            start_time, end_time, frame_frequency
+        )
+
+        # set variables important for binning and histogram
+        # if no value set for spatial expansion we go up to half the boxlength in z-direction
+        spatial_range = (
+            spatial_range if spatial_range else self.topology.get_cell_lengths_and_angles()[2] / 2
+        )
+
+        print(f"Compute radial distribution function up to a radial distance of {spatial_range}")
+
+        # define default bin width which will be used to determine number of bins if not given
+        default_bin_width = 0.02
+        spatial_resolution = (
+            spatial_resolution if spatial_resolution else int(spatial_range / default_bin_width)
+        )
+
+        # determine which position universe are to be used in case of PIMD
+        # Thermodynamic properties are based on trajectory of replica
+        tmp_position_universes = (
+            self.position_universes
+            if len(self.position_universes) == 1
+            else self.position_universes[1::]
+        )
+
+        rdfs_sampled = []
+        # loop over all universes
+        for count_universe, universe in enumerate(tmp_position_universes):
+
+            # determine MDAnalysis atom groups based on strings for the species provided
+            atom_group_1 = universe.select_atoms(f"name {species_1}")
+            atom_group_2 = universe.select_atoms(f"name {species_2}")
+
+            # initialise calculation object
+            calc = mdanalysis_rdf.InterRDF(
+                atom_group_1,
+                atom_group_2,
+                nbins=spatial_resolution,
+                range=[default_bin_width, spatial_range],
+            )
+
+            # run calculation
+            calc.run(start_frame, end_frame, frame_frequency)
+
+            # append results to list to average if necessary (PIMD)
+            rdfs_sampled.append(calc.rdf)
+
+        # average rdfs for PIMDs
+        averaged_rdf = np.mean(rdfs_sampled, axis=0)
+
+        # write to class attributes
+        name_based_on_species = f"{species_1}-{species_2}"
+
+        self.radial_distribution_functions[name_based_on_species] = [calc.bins, averaged_rdf]
