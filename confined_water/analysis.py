@@ -219,13 +219,14 @@ class Simulation:
         )
 
         # check whether chosen species are found in universe
-        species_in_system = np.unique(tmp_position_universes)
+        species_in_system = np.unique(tmp_position_universes[0].atoms.names)
 
         if species_1 not in species_in_system or species_2 not in species_in_system:
             raise KeyNotFound(f"At least on of the species specified is not in the system.")
 
         rdfs_sampled = []
         # loop over all universes
+
         for count_universe, universe in enumerate(tmp_position_universes):
 
             # determine MDAnalysis atom groups based on strings for the species provided
