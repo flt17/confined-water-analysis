@@ -140,3 +140,19 @@ class TestSimulation_ComputeDensityProfileAlongCartesianAxis:
         simulation.compute_density_profile(["O", "H"], direction="z")
 
         assert simulation.density_profiles.get("O H - z")
+
+
+class TestSimulation_ComputeDensityProfileInRadialDirection:
+    def test_returns_profile_radial_direction_parallel_to_z_axis(self):
+
+        path = "./files/water_in_carbon_nanotube"
+
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True)
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+        simulation.compute_density_profile(["O", "H"], direction="radial z")
+
+        assert simulation.density_profiles.get("O H - radial z")

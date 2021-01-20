@@ -285,7 +285,7 @@ class Simulation:
         """
 
         # check in which direction/orientation density profile should be calculated
-        dictionary_direction = {"x": 0, "y": 1, "z": 2, "radial": 3}
+        dictionary_direction = {"x": 0, "y": 1, "z": 2, "radial x": 0, "radial y": 1, "radial z": 2}
 
         direction_index = dictionary_direction.get(direction)
         if not direction_index:
@@ -322,11 +322,23 @@ class Simulation:
             atoms_selected = universe.select_atoms(f"name {selected_species_string}")
 
             # call function dependent on direction:
-            if direction_index < 3:
+            if "radial" not in direction:
                 (
                     bins_histogram,
                     density_profile,
                 ) = self._compute_density_profile_along_cartesian_axis(
+                    universe,
+                    atoms_selected,
+                    direction_index,
+                    start_frame,
+                    end_frame,
+                    frame_frequency,
+                )
+            else:
+                (
+                    bins_histogram,
+                    density_profile,
+                ) = self._compute_density_profile_in_radial_direction(
                     universe,
                     atoms_selected,
                     direction_index,
@@ -385,7 +397,7 @@ class Simulation:
         reference_atoms = position_universe.select_atoms(f"name {reference_species_string}")
 
         # define range and bin width for histogram binning
-        # bin range is simply the box in the given direction
+        # bin range is simply the box length in the given direction
         bin_range = self.topology.get_cell_lengths_and_angles()[direction]
         # for now, bin width is set to a default value of 0.1 angstroms
         bin_width = 0.1
@@ -438,3 +450,102 @@ class Simulation:
         density_profile = mass_profile / volume_per_bin
 
         return bins_histogram, density_profile
+
+    def _compute_density_profile_in_radial_direction(
+        self,
+        position_universe,
+        atoms_selected,
+        direction: int,
+        start_frame: int,
+        end_frame: int,
+        frame_frequency: int,
+    ):
+        """
+        Compute density profile in radial direction around
+        Arguments:
+            position_universe : MDAnalysis universe with trajectory.
+            atoms_selected (str) : Atoms considered in the density profile.
+            direction (int) : Direction of axis through COM from which
+                             the profile is computed radially, x=0, y=1, z=2.
+            start_frame (int) : Start frame for analysis.
+            end_frame (int) : End frame for analysis.
+            frame_frequency (int): Take every nth frame only.
+        Returns:
+            bins_histogram (np.array): Bins of the histogram of the density profile.
+                                      Note that the bins are based on the center of np.digitize.
+            density_profile (np.asarray) : Density profile based on the bins.
+
+        """
+        # define range and bin width for histogram binning
+        # bin range is simply the half box length along axis orthogonal to direction (squared area)
+        bin_range = self.topology.get_cell_lengths_and_angles()[0:3][direction - 1] * 0.5
+        # for now, bin width is set to a default value of 0.1 angstroms
+        bin_width = 0.1
+        bins_histogram = np.arange(0, bin_range, bin_width)
+
+        # initialise mass profile array
+        mass_profile = np.zeros(bins_histogram.shape[0])
+
+        # Loop over trajectory
+        for count_frames, frames in enumerate(
+            tqdm((position_universe.trajectory[start_frame:end_frame])[::frame_frequency])
+        ):
+
+            # compute reference coordinate, i.e. center of mass of all atoms
+            system_center_of_mass = np.ma.array(position_universe.atoms.center_of_mass())
+            system_center_of_mass[direction] = np.ma.masked
+            reference_coordinates = system_center_of_mass.compressed()
+
+            # compute radial distances from axis through center of mass in given direciton for selected atoms
+            positions_atoms_selected = np.ma.array(atoms_selected.positions)
+            positions_atoms_selected[:, direction] = np.ma.masked
+            positions_atoms_selected_orthogonal = positions_atoms_selected.compressed().reshape(
+                -1, 2
+            )
+
+            radial_distances_to_axis = np.linalg.norm(
+                positions_atoms_selected_orthogonal - reference_coordinates, axis=1
+            )
+
+            # digitize distances
+            # NOTE: values are assigned to bins according to i <= x[i] < i+1
+            digitized_radial_distances = np.digitize(radial_distances_to_axis, bins_histogram)
+
+            # Compute density profile of frame by looping over all bins and check if theres a match
+            bins_occupied_by_atoms = np.unique(digitized_radial_distances)
+            for occupied_bin in bins_occupied_by_atoms:
+                # at this point compute only mass profile, units g
+                mass_profile[occupied_bin] += np.sum(
+                    np.where(digitized_radial_distances == occupied_bin, 1, 0)
+                    * atoms_selected.masses
+                    / AVOGADRO
+                )
+
+        # normalise mass profile by number of frames
+        mass_profile = mass_profile / (count_frames + 1)
+
+        # compute density profile by dividing each mass bin by its volume in cm^3
+        # Volume depends on the bin
+        # get center of bins and add artificial one for the last entry
+        center_of_bins = 0.5 * (bins_histogram[0:-1] + bins_histogram[1::])
+        center_of_bins = np.append(center_of_bins, center_of_bins[-1] + bin_width)
+
+        # define volumes for each bin in cm^3
+        volume_per_bin = (
+            np.pi
+            * (center_of_bins[1::] ** 2 - center_of_bins[0:-1] ** 2)
+            * self.topology.get_cell_lengths_and_angles()[direction]
+            * 1e-24
+        )
+
+        volume_per_bin = np.insert(
+            volume_per_bin,
+            0,
+            np.pi
+            * center_of_bins[0] ** 2
+            * self.topology.get_cell_lengths_and_angles()[direction]
+            * 1e-24,
+        )
+
+        density_profile = mass_profile / volume_per_bin
+        return center_of_bins, density_profile
