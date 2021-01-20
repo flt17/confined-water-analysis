@@ -1,10 +1,16 @@
 import numpy as np
 import sys
+from tqdm.notebook import tqdm
 
 import MDAnalysis.analysis.rdf as mdanalysis_rdf
 
 sys.path.append("../")
 from confined_water import utils
+
+
+# GLOBAL VARIABLES
+
+AVOGADRO = 6.0221409 * 1e23
 
 
 class KeyNotFound(Exception):
@@ -67,6 +73,8 @@ class Simulation:
 
         self.radial_distribution_functions = {}
 
+        self.density_profiles = {}
+
     def read_in_simulation_data(
         self,
         read_positions: bool = True,
@@ -101,6 +109,8 @@ class Simulation:
             self.position_universes = (
                 universes if isinstance(universes, list) == True else [universes]
             )
+
+            self.species_in_system = np.unique(self.position_universes[0].atoms.names)
 
     def set_sampling_times(
         self,
@@ -219,9 +229,7 @@ class Simulation:
         )
 
         # check whether chosen species are found in universe
-        species_in_system = np.unique(tmp_position_universes[0].atoms.names)
-
-        if species_1 not in species_in_system or species_2 not in species_in_system:
+        if species_1 not in self.species_in_system or species_2 not in self.species_in_system:
             raise KeyNotFound(f"At least on of the species specified is not in the system.")
 
         rdfs_sampled = []
@@ -254,3 +262,179 @@ class Simulation:
         name_based_on_species = f"{species_1}-{species_2}"
 
         self.radial_distribution_functions[name_based_on_species] = [calc.bins, averaged_rdf]
+
+    def compute_density_profile(
+        self,
+        species: list,
+        direction: str,
+        start_time: int = None,
+        end_time: int = None,
+        frame_frequency: int = None,
+    ):
+        """
+        Compute density profile either radially or in a given direction
+        Arguments:
+            species (list) : Elements considered in the density profile
+            direction (str) : Direction in which the profile is computed.
+                            Can be either x,y,z or radial.
+            start_time (int) : Start time for analysis (optional).
+            end_time (int) : End time for analysis (optional).
+            frame_frequency (int): Take every nth frame only (optional).
+        Returns:
+
+        """
+
+        # check in which direction/orientation density profile should be calculated
+        dictionary_direction = {"x": 0, "y": 1, "z": 2, "radial": 3}
+
+        direction_index = dictionary_direction.get(direction)
+        if not direction_index:
+            raise KeyNotFound(
+                f"Specified direction is unknown. Possible options are {dictionary_direction.keys()}"
+            )
+
+        # check if all species are a subset of species in system
+        if not set(species).issubset(self.species_in_system):
+            raise KeyNotFound(f"At least on of the species specified is not in the system.")
+
+        # get information about sampling either from given arguments or previously set
+        start_frame, end_frame, frame_frequency = self._get_sampling_frames(
+            start_time, end_time, frame_frequency
+        )
+
+        # determine which position universe are to be used in case of PIMD
+        # Thermodynamic properties are based on trajectory of replica
+        tmp_position_universes = (
+            self.position_universes
+            if len(self.position_universes) == 1
+            else self.position_universes[1::]
+        )
+
+        # convert list to string for species:
+        selected_species_string = " ".join(species)
+
+        density_profiles_sampled = []
+
+        # Loop over all universes
+        for count_universe, universe in enumerate(tmp_position_universes):
+
+            # select atoms according to species
+            atoms_selected = universe.select_atoms(f"name {selected_species_string}")
+
+            # call function dependent on direction:
+            if direction_index < 3:
+                (
+                    bins_histogram,
+                    density_profile,
+                ) = self._compute_density_profile_along_cartesian_axis(
+                    universe,
+                    atoms_selected,
+                    direction_index,
+                    start_frame,
+                    end_frame,
+                    frame_frequency,
+                )
+
+            density_profiles_sampled.append(density_profile)
+
+        # average rdfs for PIMDs
+        averaged_density_profile = np.mean(density_profiles_sampled, axis=0)
+
+        # write to class attributes
+        name_based_on_species_and_direction = f"{selected_species_string} - {direction}"
+
+        self.density_profiles[name_based_on_species_and_direction] = [
+            bins_histogram,
+            averaged_density_profile,
+        ]
+
+    def _compute_density_profile_along_cartesian_axis(
+        self,
+        position_universe,
+        atoms_selected,
+        direction: int,
+        start_frame: int,
+        end_frame: int,
+        frame_frequency: int,
+    ):
+        """
+        Compute density profile in a given direction along cartesian axis.
+        Arguments:
+            position_universe : MDAnalysis universe with trajectory.
+            atoms_selected (str) : Atoms considered in the density profile.
+            direction (int) : Direction in which the profile is computed.
+                            x=0, y=1, z=2.
+            start_frame (int) : Start frame for analysis.
+            end_frame (int) : End frame for analysis.
+            frame_frequency (int): Take every nth frame only.
+        Returns:
+            bins_histogram (np.array): Bins of the histogram of the density profile.
+            density_profile (np.asarray) : Density profile based on the bins.
+
+        """
+
+        # determine reference atoms, here only solid atoms (B,N,C) allowed
+        reference_species = ["B", "N", "C"]
+        reference_species_string = " ".join(reference_species)
+
+        if not set(self.species_in_system).intersection(reference_species):
+            raise KeyNotFound(
+                f"Couldn't find a solid phase in this trajectory. Currently only {reference_species_string} are implemented."
+            )
+
+        reference_atoms = position_universe.select_atoms(f"name {reference_species_string}")
+
+        # define range and bin width for histogram binning
+        # bin range is simply the box in the given direction
+        bin_range = self.topology.get_cell_lengths_and_angles()[direction]
+        # for now, bin width is set to a default value of 0.1 angstroms
+        bin_width = 0.1
+        bins_histogram = np.arange(0, bin_range, bin_width)
+
+        # initialise mass profile array
+        mass_profile = np.zeros(bins_histogram.shape[0])
+
+        # Loop over trajectory
+        for count_frames, frames in enumerate(
+            tqdm((position_universe.trajectory[start_frame:end_frame])[::frame_frequency])
+        ):
+
+            # compute reference coordinate, i.e. center of mass of reference atoms in specified direction
+            reference_coordinate = reference_atoms.center_of_mass()[direction]
+
+            # compute coordinates in given direciton for select atoms relative to reference_coordinate
+            relative_coordinates_selected_atoms = (
+                atoms_selected.positions[:, direction] - reference_coordinate
+            )
+
+            # digitize relative positions
+            # NOTE: values are assigned to bins according to i <= x[i] < i+1
+            digitized_relative_coordinates = np.digitize(
+                relative_coordinates_selected_atoms, bins_histogram
+            )
+
+            # Compute density profile of frame by looping over all bins and check if theres a match
+            bins_occupied_by_atoms = np.unique(digitized_relative_coordinates)
+            for occupied_bin in bins_occupied_by_atoms:
+                # at this point compute only mass profile, units g
+                mass_profile[occupied_bin] += np.sum(
+                    np.where(digitized_relative_coordinates == occupied_bin, 1, 0)
+                    * atoms_selected.masses
+                    / AVOGADRO
+                )
+
+        # normalise mass profile by number of frames
+        mass_profile = mass_profile / (count_frames + 1)
+
+        # compute density profile by dividing each mass bin by its volume in cm^3
+        # only possible for orthrombic cells
+        volume_per_bin = (
+            bin_width
+            * np.product(self.topology.get_cell_lengths_and_angles()[0:3])
+            / self.topology.get_cell_lengths_and_angles()[direction]
+            * 1e-24
+        )
+
+        density_profile = mass_profile / volume_per_bin
+
+        return bins_histogram, density_profile

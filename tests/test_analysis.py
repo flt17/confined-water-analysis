@@ -78,3 +78,65 @@ class TestSimulationComputeRDF:
             )
             < 2e-2
         )
+
+
+class TestSimulationComputeDensityProfile:
+    def test_raises_error_when_species_not_found(self):
+        path = "./files/bulk_water/classical"
+
+        topology_name = "revPBE0-D3-w64-T300K-1bar"
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True, topology_file_name=topology_name)
+
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+
+        with pytest.raises(analysis.KeyNotFound):
+            simulation.compute_density_profile(["O", "H", "C"], direction="z")
+
+    def test_raises_error_when_direction_not_found(self):
+        path = "./files/water_on_graphene"
+
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True)
+
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+
+        with pytest.raises(analysis.KeyNotFound):
+            simulation.compute_density_profile(["O", "H"], direction="w")
+
+
+class TestSimulation_ComputeDensityProfileAlongCartesianAxis:
+    def test_raises_error_when_no_solid_is_found(self):
+        path = "./files/bulk_water/classical"
+
+        topology_name = "revPBE0-D3-w64-T300K-1bar"
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True, topology_file_name=topology_name)
+
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+
+        with pytest.raises(analysis.KeyNotFound):
+            simulation.compute_density_profile(["O", "H"], direction="z")
+
+    def test_returns_profile_in_z_direction(self):
+
+        path = "./files/water_on_graphene"
+
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True)
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+        simulation.compute_density_profile(["O", "H"], direction="z")
+
+        assert simulation.density_profiles.get("O H - z")
