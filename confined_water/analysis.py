@@ -5,6 +5,7 @@ from tqdm.notebook import tqdm
 import MDAnalysis.analysis.rdf as mdanalysis_rdf
 
 sys.path.append("../")
+from confined_water import hydrogen_bonding
 from confined_water import utils
 
 
@@ -549,3 +550,38 @@ class Simulation:
 
         density_profile = mass_profile / volume_per_bin
         return center_of_bins, density_profile
+
+    def set_up_hydrogen_bonding_analysis(
+        self, start_time: int = None, end_time: int = None, frame_frequency: int = None
+    ):
+
+        """
+        Prepare everything for hydrogen bonding analysis by initialsing instance of
+        HydrogenBonding for each position_universe. This will be used to identify
+        all hydrogen bonds within the given times.
+        Arguments:
+            start_time (int) : Start time for analysis (optional).
+            end_time (int) : End time for analysis (optional).
+            frame_frequency (int): Take every nth frame only (optional).
+        Returns:
+
+        """
+
+        # get information about sampling either from given arguments or previously set
+        start_frame, end_frame, frame_frequency = self._get_sampling_frames(
+            start_time, end_time, frame_frequency
+        )
+
+        # determine which position universe are to be used in case of PIMD
+        # Thermodynamic properties are based on trajectory of replica
+        tmp_position_universes = (
+            self.position_universes
+            if len(self.position_universes) == 1
+            else self.position_universes[1::]
+        )
+
+        # Loop over all universes
+        for count_universe, universe in enumerate(tmp_position_universes):
+
+            # create instance of hydrogen_bonding.HydrogenBonding
+            hydrogen_bonding_per_universe = hydrogen_bonding.HydrogenBonding(universe)
