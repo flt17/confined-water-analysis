@@ -118,7 +118,7 @@ class Simulation:
         start_time: int = None,
         end_time: int = None,
         frame_frequency: int = None,
-        time_between_frames: int = None,
+        time_between_frames: float = None,
     ):
 
         """
@@ -127,7 +127,7 @@ class Simulation:
             start_time (int) : Start time for analysis.
             end_time (int) : End time for analysis.
             frame_frequency (int): Take every nth frame only.
-            time_between_frames (int): Time (in fs) between two frames in sampled trajectory, e.g. 100 fs.
+            time_between_frames (float): Time (in fs) between two frames in sampled trajectory, e.g. 100 fs.
         Returns:
 
         """
@@ -584,4 +584,9 @@ class Simulation:
         for count_universe, universe in enumerate(tmp_position_universes):
 
             # create instance of hydrogen_bonding.HydrogenBonding
-            hydrogen_bonding_per_universe = hydrogen_bonding.HydrogenBonding(universe)
+            hydrogen_bonding_analysis = hydrogen_bonding.HydrogenBonding(universe)
+
+            # find all acceptor-donor pairs
+            hydrogen_bonding_analysis.find_acceptor_donor_pairs(
+                start_frame, end_frame, frame_frequency, self.time_between_frames
+            )
