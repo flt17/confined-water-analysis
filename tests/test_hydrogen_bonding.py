@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 import sys
 
@@ -16,9 +17,15 @@ class TestHydrogenBondingFindAcceptorDonorPairs:
         simulation.read_in_simulation_data(read_positions=True, topology_file_name=topology_name)
 
         hydrogen_bonding_analysis = hydrogen_bonding.HydrogenBonding(
-            simulation.position_universes[0]
+            simulation.position_universes[0], simulation.topology
         )
 
         hydrogen_bonding_analysis.find_acceptor_donor_pairs(
-            start_frame=0, end_frame=-1, frame_frequency=10, time_between_frames=20
+            start_frame=0,
+            end_frame=-1,
+            frame_frequency=10,
+            time_between_frames=20,
+            pbc_dimensions="xyz",
         )
+
+        assert np.max(hydrogen_bonding_analysis.dataframe["Time"]) == 2000

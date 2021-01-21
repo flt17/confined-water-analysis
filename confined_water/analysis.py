@@ -72,9 +72,12 @@ class Simulation:
 
         self.directory_path = directory_path
 
-        self.radial_distribution_functions = {}
+        # set system periodicity per default:
+        self.set_pbc_dimensions("xyz")
 
+        self.radial_distribution_functions = {}
         self.density_profiles = {}
+        self.hydrogen_bonding = []
 
     def read_in_simulation_data(
         self,
@@ -112,6 +115,32 @@ class Simulation:
             )
 
             self.species_in_system = np.unique(self.position_universes[0].atoms.names)
+
+    def set_pbc_dimensions(self, pbc_dimensions: str):
+        """
+        Set in which direction pbc apply.
+        Arguments:
+            pbc_dimensions (str) : string of directions in which pbc apply.
+
+        Returns:
+
+        """
+
+        dimension_dictionary = {
+            "x": [0],
+            "xy": [0, 1],
+            "xz": [0, 2],
+            "y": [1],
+            "yz": [1, 2],
+            "z": [2],
+            "xyz": [0, 1, 2],
+        }
+
+        if not dimension_dictionary.get(pbc_dimensions):
+            raise KeyNotFound(
+                f"Specified dimension {pbc_dimensions} is unknown. Possible options are {dimension_dictionary.keys()}"
+            )
+        self.pbc_dimensions = pbc_dimensions
 
     def set_sampling_times(
         self,
@@ -189,7 +218,8 @@ class Simulation:
         frame_frequency: int = None,
     ):
         """
-        Compute radial distribution function for given species.
+        Compute radial distribution function for given species. Currently, only
+        works for wrapped trajectories.
         Arguments:
             species_1 (str) : Name of species (element) used here.
             species_2 (str) : Name of species (element) used here
@@ -580,13 +610,23 @@ class Simulation:
             else self.position_universes[1::]
         )
 
+        hydrogen_bonding_objects = []
+
         # Loop over all universes
         for count_universe, universe in enumerate(tmp_position_universes):
 
             # create instance of hydrogen_bonding.HydrogenBonding
-            hydrogen_bonding_analysis = hydrogen_bonding.HydrogenBonding(universe)
+            hydrogen_bonding_analysis = hydrogen_bonding.HydrogenBonding(universe, self.topology)
 
             # find all acceptor-donor pairs
             hydrogen_bonding_analysis.find_acceptor_donor_pairs(
-                start_frame, end_frame, frame_frequency, self.time_between_frames
+                start_frame,
+                end_frame,
+                frame_frequency,
+                self.time_between_frames,
+                self.pbc_dimensions,
             )
+
+            hydrogen_bonding_objects.append(hydrogen_bonding_analysis)
+
+        self.hydrogen_bonding = hydrogen_bonding_objects

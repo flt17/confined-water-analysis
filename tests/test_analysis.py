@@ -156,3 +156,18 @@ class TestSimulation_ComputeDensityProfileInRadialDirection:
         simulation.compute_density_profile(["O", "H"], direction="radial z")
 
         assert simulation.density_profiles.get("O H - radial z")
+
+
+class TestSimulation_SetUpHydrogenBondingAnalysis:
+    def test_returns_hydrogen_bonding_objects_for_PIMD(self):
+        path = "./files/bulk_water/quantum"
+
+        simulation = analysis.Simulation(path)
+        simulation.read_in_simulation_data(read_positions=True)
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=10, time_between_frames=20
+        )
+
+        simulation.set_up_hydrogen_bonding_analysis()
+
+        assert len(simulation.hydrogen_bonding) == 4
