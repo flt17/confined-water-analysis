@@ -153,3 +153,53 @@ def get_mdanalysis_universe(
             mdanalysis.Universe(topology_file, traj_file) for traj_file in trajectory_files[1::]
         ]
         return [centroid_universe, *beat_universes]
+
+
+def apply_minimum_image_convention_to_interatomic_vectors(
+    vectors: np.array,
+    lattice_vectors: np.array,
+    dimension: str = "xyz",
+):
+    """
+    Return vectors which follow the minimum image convention. This function should be mainly
+    used in the context of larger scripts when the nearest neighbors or distance criteria are
+    needed to compute properties.
+    Currently, only implemented for orthorombic cells.
+
+    Arguments:
+        vectors (np.array): Vectors between atoms.
+        lattice_vector_a (np.array): Lattice vectors of simulation box.
+        dimension (str) : to speed up calculatio only perform transformation in the periodic direction.
+
+
+    Returns:
+        vectors_MIC: Vectors which are in line with the minimum image convention.
+    """
+    # implement minimum image convention in x-direction
+
+    dimension_dictionary = {
+        "x": [0],
+        "xy": [0, 1],
+        "xz": [0, 2],
+        "y": [1],
+        "yz": [1, 2],
+        "z": [2],
+        "xyz": [0, 1, 2],
+    }
+
+    if not dimension_dictionary.get(dimension):
+        raise UndefinedOption(
+            f"Specified dimension {dimension} is unknown. Possible options are {dimension_dictionary.keys()}"
+        )
+
+    for dim in dimension_dictionary.get(dimension):
+
+        vectors[
+            np.where(np.take(vectors, dim, axis=-1) > lattice_vectors[dim][dim] / 2)
+        ] -= lattice_vectors[dim]
+        vectors[
+            np.where(np.take(vectors, dim, axis=-1) < -lattice_vectors[dim][dim] / 2)
+        ] += lattice_vectors[dim]
+
+    vectors_MIC = vectors
+    return vectors_MIC

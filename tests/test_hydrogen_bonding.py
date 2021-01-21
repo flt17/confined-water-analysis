@@ -20,5 +20,5 @@ class TestHydrogenBondingFindAcceptorDonorPairs:
         )
 
         hydrogen_bonding_analysis.find_acceptor_donor_pairs(
-            start_frame=0, end_frame=-1, frame_frequency=1, time_between_frames=20
+            start_frame=0, end_frame=-1, frame_frequency=10, time_between_frames=20
         )

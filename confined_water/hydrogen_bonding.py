@@ -63,7 +63,7 @@ class HydrogenBonding:
             # start with: 1.) oxygen-oxygen criterion
 
             # define all vectors between all oxygens in the system:
-            oxygen_oxygen_vectors = (
+            vectors_oxygen_oxygen = (
                 oxygen_atoms.positions[np.newaxis, :] - oxygen_atoms.positions[:, np.newaxis]
             )
 

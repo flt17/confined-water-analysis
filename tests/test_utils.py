@@ -1,9 +1,11 @@
+import numpy as np
 import os
 import pytest
 import sys
 from unittest import mock
 
 sys.path.append("../")
+from confined_water import analysis
 from confined_water import utils
 
 
@@ -85,3 +87,66 @@ class TestGetMdanalysisUniverse:
         mdanalysis_universes = utils.get_mdanalysis_universe(path, universe_type, pdb_prefix)
 
         assert len(mdanalysis_universes) == 5
+
+
+class TestApplyMinimumImageConventionToInteratomicVectors:
+    def test_raises_error_when_unknown_dimension(self):
+        path = "./files/bulk_water/classical"
+
+        topology_name = "revPBE0-D3-w64-T300K-1bar"
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True, topology_file_name=topology_name)
+
+        oxygens = simulation.position_universes[0].select_atoms("name O")
+
+        vectors_oxygen_1_to_others = oxygens.positions - oxygens[0].position
+
+        with pytest.raises(utils.UndefinedOption):
+            vectors_MIC = utils.apply_minimum_image_convention_to_interatomic_vectors(
+                vectors_oxygen_1_to_others, simulation.topology.cell, dimension="w"
+            )
+
+    def test_returns_adjusted_vectors_2D(self):
+        path = "./files/bulk_water/classical"
+
+        topology_name = "revPBE0-D3-w64-T300K-1bar"
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True, topology_file_name=topology_name)
+
+        oxygens = simulation.position_universes[0].select_atoms("name O")
+
+        vectors_oxygen_1_to_others = oxygens.positions - oxygens[0].position
+
+        vectors_MIC = utils.apply_minimum_image_convention_to_interatomic_vectors(
+            vectors_oxygen_1_to_others,
+            simulation.topology.cell,
+        )
+
+        assert (
+            np.min(vectors_MIC) >= -simulation.topology.cell[0][0] / 2
+            and np.max(vectors_MIC) <= simulation.topology.cell[0][0] / 2
+        )
+
+    def test_returns_adjusted_vectors_3D(self):
+        path = "./files/bulk_water/classical"
+
+        topology_name = "revPBE0-D3-w64-T300K-1bar"
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True, topology_file_name=topology_name)
+
+        oxygens = simulation.position_universes[0].select_atoms("name O")
+
+        vectors_oxygen_oxygen = oxygens.positions[np.newaxis, :] - oxygens.positions[:, np.newaxis]
+
+        vectors_MIC = utils.apply_minimum_image_convention_to_interatomic_vectors(
+            vectors_oxygen_oxygen,
+            simulation.topology.cell,
+        )
+
+        assert (
+            np.min(vectors_MIC) >= -simulation.topology.cell[0][0] / 2 * 1.0005
+            and np.max(vectors_MIC) <= simulation.topology.cell[0][0] / 2 * 1.0005
+        )
