@@ -9,11 +9,7 @@ import MDAnalysis.analysis.rdf as mdanalysis_rdf
 sys.path.append("../")
 from confined_water import hydrogen_bonding
 from confined_water import utils
-
-
-# GLOBAL VARIABLES
-
-AVOGADRO = 6.0221409 * 1e23
+from confined_water import global_variables
 
 
 class KeyNotFound(Exception):
@@ -168,19 +164,9 @@ class Simulation:
 
         """
 
-        dimension_dictionary = {
-            "x": [0],
-            "xy": [0, 1],
-            "xz": [0, 2],
-            "y": [1],
-            "yz": [1, 2],
-            "z": [2],
-            "xyz": [0, 1, 2],
-        }
-
-        if not dimension_dictionary.get(pbc_dimensions):
+        if not global_variables.DIMENSION_DICTIONARY.get(pbc_dimensions):
             raise KeyNotFound(
-                f"Specified dimension {pbc_dimensions} is unknown. Possible options are {dimension_dictionary.keys()}"
+                f"Specified dimension {pbc_dimensions} is unknown. Possible options are {global_variables.DIMENSION_DICTIONARY.keys()}"
             )
         self.pbc_dimensions = pbc_dimensions
 
@@ -223,7 +209,11 @@ class Simulation:
         print(f"Frame frequency: \t{self.frame_frequency}")
 
     def _get_sampling_frames(
-        self, start_time: int = None, end_time: int = None, frame_frequency: int = None
+        self,
+        start_time: int = None,
+        end_time: int = None,
+        frame_frequency: int = None,
+        time_between_frames: float = None,
     ):
         """
         Determine sampling frames from given sampling times.
@@ -231,12 +221,18 @@ class Simulation:
             start_time (int) : Start time for analysis.
             end_time (int) : End time for analysis.
             frame_frequency (int): Take every nth frame only.
+            time_between_frames (float): Time (in fs) between frames. Usually, this is set at the very beginning.
+                            Exception applies only to calculation of friction where this is set in the method.
         Returns:
             start_frame (int) : Start frame for analysis.
             end_frame (int) : End frame for analysis.
             frame_frequency (int): Take every nth frame only.
 
         """
+        time_between_frames = (
+            time_between_frames if time_between_frames else self.time_between_frames
+        )
+
         start_time = start_time if start_time is not None else self.start_time
         end_time = end_time if end_time is not None else self.end_time
 
@@ -244,8 +240,8 @@ class Simulation:
             frame_frequency if frame_frequency is not None else self.frame_frequency
         )
 
-        start_frame = int(start_time / self.time_between_frames)
-        end_frame = int(end_time / self.time_between_frames)
+        start_frame = int(start_time / time_between_frames)
+        end_frame = int(end_time / time_between_frames)
 
         return start_frame, end_frame, frame_frequency
 
@@ -505,7 +501,7 @@ class Simulation:
                 mass_profile[occupied_bin] += np.sum(
                     np.where(digitized_relative_coordinates == occupied_bin, 1, 0)
                     * atoms_selected.masses
-                    / AVOGADRO
+                    / global_variables.AVOGADRO
                 )
 
         # normalise mass profile by number of frames
@@ -591,7 +587,7 @@ class Simulation:
                 mass_profile[occupied_bin] += np.sum(
                     np.where(digitized_radial_distances == occupied_bin, 1, 0)
                     * atoms_selected.masses
-                    / AVOGADRO
+                    / global_variables.AVOGADRO
                 )
 
         # normalise mass profile by number of frames
@@ -853,3 +849,34 @@ class Simulation:
             average_mean_squared_displacement,
             std_mean_squared_displacement,
         ]
+
+    def compute_friction_coefficient_via_green_kubo(
+        self,
+        time_between_frames: float,
+        correlation_time: float = 1000.0,
+        start_time: int = None,
+        end_time: int = None,
+        frame_frequency: int = None,
+    ):
+        """
+        Compute mean friction coefficient lambda via green kubo relation from summed force autocorrelation.
+        Arguments:
+            time_between_frames (float): Time (in fs) between frames where summed force was measured.
+                                        This will substantially vary from the usual printing frequency.
+            correlation_time (float) : Time (in fs) to correlate the summed forces, 1000 fs should be usually sufficient.
+            start_time (int) : Start time for analysis (optional).
+            end_time (int) : End time for analysis (optional).
+            frame_frequency (int): Take every nth frame only (optional).
+        Returns:
+        """
+
+        # get information about sampling either from given arguments or previously set
+        start_frame, end_frame, frame_frequency = self._get_sampling_frames(
+            start_time, end_time, frame_frequency, time_between_frames
+        )
+        # convert correlation_time to correlation_frames taken into account the time between frames and
+        # the frame frequency
+        number_of_correlation_frames = int(correlation_time / time_between_frames / frame_frequency)
+
+        # get indices in which direction we would like to compute the frictino, usually along one or two axis
+        direction_index = global_variables.DIMENSION_DICTIONARY[self.pbc_dimensions]

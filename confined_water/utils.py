@@ -1,12 +1,16 @@
 import glob
 import numpy as np
 import os
+import sys
 
 import ase
 from ase import io
 from ase.io import lammpsrun
 
 import MDAnalysis as mdanalysis
+
+sys.path.append("../")
+from confined_water import global_variables
 
 
 class UnableToFindFile(Exception):
@@ -177,22 +181,12 @@ def apply_minimum_image_convention_to_interatomic_vectors(
     """
     # implement minimum image convention in x-direction
 
-    dimension_dictionary = {
-        "x": [0],
-        "xy": [0, 1],
-        "xz": [0, 2],
-        "y": [1],
-        "yz": [1, 2],
-        "z": [2],
-        "xyz": [0, 1, 2],
-    }
-
-    if not dimension_dictionary.get(dimension):
+    if not global_variables.DIMENSION_DICTIONARY.get(dimension):
         raise UndefinedOption(
-            f"Specified dimension {dimension} is unknown. Possible options are {dimension_dictionary.keys()}"
+            f"Specified dimension {dimension} is unknown. Possible options are {global_variables.DIMENSION_DICTIONARY.keys()}"
         )
 
-    for dim in dimension_dictionary.get(dimension):
+    for dim in global_variables.DIMENSION_DICTIONARY.get(dimension):
 
         vectors[
             np.where(np.take(vectors, dim, axis=-1) > lattice_vectors[dim][dim] / 2)
