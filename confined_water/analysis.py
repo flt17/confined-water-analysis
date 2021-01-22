@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import sys
 from tqdm.notebook import tqdm
@@ -15,6 +16,14 @@ AVOGADRO = 6.0221409 * 1e23
 
 
 class KeyNotFound(Exception):
+    pass
+
+
+class VariableNotSet(Exception):
+    pass
+
+
+class UnphysicalValue(Exception):
     pass
 
 
@@ -71,6 +80,7 @@ class Simulation:
         """
 
         self.directory_path = directory_path
+        self.time_between_frames = None
 
         # set system periodicity per default:
         self.set_pbc_dimensions("xyz")
@@ -78,6 +88,7 @@ class Simulation:
         self.radial_distribution_functions = {}
         self.density_profiles = {}
         self.hydrogen_bonding = []
+        self.mean_squared_displacements = {}
 
     def read_in_simulation_data(
         self,
@@ -630,3 +641,184 @@ class Simulation:
             hydrogen_bonding_objects.append(hydrogen_bonding_analysis)
 
         self.hydrogen_bonding = hydrogen_bonding_objects
+
+    def compute_mean_squared_displacement(
+        self,
+        species: list,
+        correlation_time: float = 5000.0,
+        number_of_blocks: int = 30,
+        start_time: int = None,
+        end_time: int = None,
+        frame_frequency: int = None,
+    ):
+        """
+        Compute mean squared displacement (MSD) for given species.
+        Arguments:
+            species (list) : Elements considered for MSD.
+            correlation_time (float): Time (in fs) for which we will trace the movement of the atoms.
+            number_of_blocks (int): Number of blocks used for block average of MSD.
+            start_time (int) : Start time for analysis (optional).
+            end_time (int) : End time for analysis (optional).
+            frame_frequency (int): Take every nth frame only (optional).
+        Returns:
+
+        """
+
+        # check if all species are a subset of species in system
+        if not set(species).issubset(self.species_in_system):
+            raise KeyNotFound(f"At least on of the species specified is not in the system.")
+
+        # check if all species are a subset of species in system
+        if not self.time_between_frames:
+            raise VariableNotSet(
+                f"Time between frames (in fs) is not specified yet. Please do this via self.set_sampling_times()."
+            )
+
+        # get information about sampling either from given arguments or previously set
+        start_frame, end_frame, frame_frequency = self._get_sampling_frames(
+            start_time, end_time, frame_frequency
+        )
+
+        # convert correlation_time to correlation_frames taken into account the time between frames and
+        # the frame frequency
+        number_of_correlation_frames = int(
+            correlation_time / self.time_between_frames / frame_frequency
+        )
+
+        # determine which position universe are to be used in case of PIMD
+        # Dynamical properties are based on trajectory of centroid!
+        tmp_position_universe = self.position_universes[0]
+
+        # check if correlation time can be obtained with current trajectory:
+        if number_of_correlation_frames >= tmp_position_universe.trajectory.n_frames:
+            raise UnphysicalValue(
+                f" You want to compute a correlation based on {number_of_correlation_frames} frames."
+                f"However, the provided trajectory contains only {tmp_position_universe.trajectory.n_frames} frames.",
+                f" Please adjust your correlation time or run longer trajectories.",
+            )
+
+        # convert list to string for species and select atoms of these species:
+        selected_species_string = " ".join(species)
+        atoms_selected = tmp_position_universe.select_atoms(f"name {selected_species_string}")
+
+        # allocate array for all positions of all selected atoms for all frames sampled
+        number_of_samples = int((end_frame - start_frame) / frame_frequency)
+        saved_positions_atoms_selected = np.zeros((number_of_samples, len(atoms_selected), 3))
+
+        # allocate array for MSD, length of number_of_correlation_frames
+        mean_squared_displacement = np.zeros(number_of_correlation_frames)
+        # allocate array for number of samples per correlation frame
+        number_of_samples_correlated = np.zeros(number_of_correlation_frames)
+        # allocate array for blocks of MSD for statistical error analysis
+        mean_squared_displacement_blocks = np.zeros(
+            (number_of_blocks, number_of_correlation_frames)
+        )
+        # define how many samples are evaluated per block
+        number_of_samples_per_block = math.ceil(number_of_samples / number_of_blocks)
+        index_current_block_used = 0
+
+        # make sure that each block can reach full correlation time
+        if number_of_samples_per_block < number_of_correlation_frames:
+            raise UnphysicalValue(
+                f" Your chosen number of blocks ({number_of_blocks}) is not allowed as:",
+                f"samples per block ({number_of_samples_per_block}) < correlation frames {number_of_correlation_frames}.",
+                f"Please reduce the number of blocks or run longer trajectories.",
+            )
+
+        # Loop over trajectory to sample all positions of selected atoms
+        for count_frames, frames in enumerate(
+            (tmp_position_universe.trajectory[start_frame:end_frame])[::frame_frequency]
+        ):
+            # This shouldn't be necessary as we should only use wrapped trajectories
+            # Leaving it in as it is cheap and better safe than sorry
+            atoms_selected.pack_into_box(
+                box=self.topology.get_cell_lengths_and_angles(), inplace=True
+            )
+
+            # fill array with positions
+            saved_positions_atoms_selected[count_frames] = atoms_selected.positions
+
+        # used the saved positions to now compute MSD
+        # Loop over saved positions
+        for frame, positions_per_frame in enumerate(tqdm(saved_positions_atoms_selected)):
+
+            # compute last frame sampled, i.e. usually frame+correlation frames
+            last_correlation_frame = frame + number_of_correlation_frames
+            if last_correlation_frame > number_of_samples - 1:
+                last_correlation_frame = number_of_samples
+
+            # define variable to save how many frames where used for correlation
+            number_of_frames_correlated = last_correlation_frame - frame
+
+            # increment which correlation frames were sampled
+            number_of_samples_correlated[0:number_of_frames_correlated] += 1
+
+            # compute how much select atoms have moved within the correlation time
+            vectors_atom_movement = (
+                saved_positions_atoms_selected[frame:last_correlation_frame]
+                - saved_positions_atoms_selected[frame]
+            )
+
+            # apply minimum image convention to these vectors
+            vectors_atom_movement_MIC = utils.apply_minimum_image_convention_to_interatomic_vectors(
+                vectors_atom_movement, self.topology.cell, self.pbc_dimensions
+            )
+
+            # compute squared_distance of the moved atoms between each frame
+            squared_distances_atom_movement = np.square(
+                np.linalg.norm(vectors_atom_movement_MIC, axis=2)
+            )
+
+            # add contributions to array (for correlations frames sampled)
+            mean_squared_displacement[0:number_of_frames_correlated] += np.mean(
+                squared_distances_atom_movement, axis=1
+            )
+
+            # to get insight on the statistical error we compute block averages
+            mean_squared_displacement_blocks[
+                index_current_block_used, 0:number_of_frames_correlated
+            ] += np.mean(squared_distances_atom_movement, axis=1)
+
+            # close block when number of samples per block are reached
+            if (
+                frame + 1 >= (index_current_block_used + 1) * number_of_samples_per_block
+                or frame + 1 == number_of_samples
+            ):
+                # initialise with 0
+                number_of_samples_correlated_per_block = 0
+                # check how many samples per frame were taken for this block
+                if index_current_block_used == 0:
+                    # in first block this corresponds to the global number of samples correlated
+                    number_of_samples_correlated_per_block = number_of_samples_correlated
+                else:
+
+                    # in all others we just need to get the difference between current and previous global samples
+                    number_of_samples_correlated_per_block = (
+                        number_of_samples_correlated - previous_global_number_of_samples_correlated
+                    )
+
+                # average current block
+                mean_squared_displacement_blocks[index_current_block_used, :] = (
+                    mean_squared_displacement_blocks[index_current_block_used, :]
+                    / number_of_samples_correlated_per_block
+                )
+
+                # define previous global number of samples
+                previous_global_number_of_samples_correlated = number_of_samples_correlated.copy()
+
+                # increment index to move to next block
+                index_current_block_used += 1
+
+        # get average MSD
+        average_mean_squared_displacement = mean_squared_displacement / number_of_samples_correlated
+
+        # compute statistical error based on block averags
+        std_mean_squared_displacement = np.std(mean_squared_displacement_blocks, axis=0)
+
+        # save all data to dictionary of class
+        string_for_dict = f"{selected_species_string} - ct: {correlation_time}"
+        self.mean_squared_displacements[string_for_dict] = [
+            np.arange(number_of_correlation_frames) * self.time_between_frames * frame_frequency,
+            average_mean_squared_displacement,
+            std_mean_squared_displacement,
+        ]
