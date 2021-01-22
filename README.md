@@ -1,6 +1,6 @@
 # confined-water-analysis
 
-Package to analyse molecular dynamics trajectories of water confined in low-dimensional materials, e.g. graphene or hexagonal boron nitride. 
+Package to analyse molecular dynamics trajectories (classical and PIMD) of water confined in low-dimensional materials, e.g. graphene or hexagonal boron nitride. So far, the application is tailored for trajectories generated with CP2K. 
 
 Tests can be run using `pytest` from the `tests` directory.
 
