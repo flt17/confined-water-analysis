@@ -1,5 +1,6 @@
 import math
 import numpy as np
+import pandas
 import sys
 from tqdm.notebook import tqdm
 
@@ -126,6 +127,36 @@ class Simulation:
             )
 
             self.species_in_system = np.unique(self.position_universes[0].atoms.names)
+
+        # Summed force (usually for solids), can be one ore multiple. If more than one, they should be averaged for each step.
+        # It is quite likely that the timestep between samples is lower than the usual printing frequency.
+        if read_summed_forces:
+            # see how many summed force files we can find
+            # ending is .dat and they should have "nnp-sumforce" in their name if done with CP2K.
+            total_summed_force_files = utils.get_path_to_file(
+                self.directory_path, "dat", "nnp-sumforce", exact_match=False
+            )
+
+            # check if multiple files found, then we need to distinguish further:
+            if len(total_summed_force_files) > 1:
+                # refine selection taking only correct files (ending on _1.dat):
+                # this might be changed when CP2K is updated
+                total_summed_force_files = [
+                    file for file in total_summed_force_files if "_1.dat" in file
+                ]
+
+            # read in summed forces with pandas, if multiple files, they are averaged immediately
+            self.summed_forces = np.mean(
+                np.asarray(
+                    [
+                        pandas.read_csv(
+                            file, skiprows=1, header=None, delim_whitespace=True
+                        ).to_numpy()
+                        for file in total_summed_force_files
+                    ]
+                ),
+                axis=0,
+            )
 
     def set_pbc_dimensions(self, pbc_dimensions: str):
         """

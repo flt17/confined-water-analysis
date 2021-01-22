@@ -1,3 +1,4 @@
+import numpy as np
 import os
 import pandas
 import pytest
@@ -26,6 +27,24 @@ class TestSimulationReadInSimulationData:
         simulation.read_in_simulation_data(read_positions=True, topology_file_name=topology_name)
 
         assert len(simulation.position_universes) == 1
+
+    def test_sets_up_summed_forces_for_quantum_simulation(self):
+        path = "./files/water_in_carbon_nanotube/quantum"
+
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=False, read_summed_forces=True)
+
+        assert np.all(simulation.summed_forces)
+
+    def test_sets_up_summed_forces_for_classical_simulation(self):
+        path = "./files/water_in_carbon_nanotube/classical"
+
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=False, read_summed_forces=True)
+
+        assert np.all(simulation.summed_forces)
 
 
 class TestConfinedWaterSystemAddSimulation:
@@ -145,7 +164,7 @@ class TestSimulation_ComputeDensityProfileAlongCartesianAxis:
 class TestSimulation_ComputeDensityProfileInRadialDirection:
     def test_returns_profile_radial_direction_parallel_to_z_axis(self):
 
-        path = "./files/water_in_carbon_nanotube"
+        path = "./files/water_in_carbon_nanotube/classical"
 
         simulation = analysis.Simulation(path)
 
