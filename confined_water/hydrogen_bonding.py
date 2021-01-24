@@ -118,7 +118,7 @@ class HydrogenBonding:
             tmp_indices_per_oxygen_crit1 = np.cumsum(
                 np.asarray(
                     [
-                        dictionary_number_of_oxygens_per_oxygen_crit1[i]
+                        dictionary_number_of_oxygens_per_oxygen_crit1.get(i, 0)
                         for i in np.arange(number_of_water_molecules)
                     ]
                 )
