@@ -265,3 +265,54 @@ class TestAnalysis_ComputeMeanSquaredDisplacement:
         )
 
         assert simulation.mean_squared_displacements.get("O H - ct: 200")
+
+
+class TestAnalysis_ComputeFrictionCoefficientViaGreenKubo:
+    def test_raises_error_when_correlation_time_is_too_high(self):
+        path = "./files/water_in_carbon_nanotube/quantum"
+
+        simulation = analysis.Simulation(path)
+        simulation.read_in_simulation_data(read_positions=False, read_summed_forces=True)
+
+        with pytest.raises(analysis.UnphysicalValue):
+            simulation.compute_friction_coefficient_via_green_kubo(
+                time_between_frames=1,
+                correlation_time=100000,
+                number_of_blocks=3000,
+                start_time=1000,
+                end_time=4500,
+                frame_frequency=1,
+            )
+
+    def test_raises_error_when_number_of_blocks_is_too_high(self):
+        path = "./files/water_in_carbon_nanotube/quantum"
+
+        simulation = analysis.Simulation(path)
+        simulation.read_in_simulation_data(read_positions=False, read_summed_forces=True)
+
+        with pytest.raises(analysis.UnphysicalValue):
+            simulation.compute_friction_coefficient_via_green_kubo(
+                time_between_frames=1,
+                correlation_time=1000,
+                number_of_blocks=3000,
+                start_time=1000,
+                end_time=4500,
+                frame_frequency=1,
+            )
+
+    def test_returns_correct_autocorrelation_function(self):
+        path = "./files/water_in_carbon_nanotube/quantum"
+
+        simulation = analysis.Simulation(path)
+        simulation.read_in_simulation_data(read_positions=False, read_summed_forces=True)
+
+        simulation.set_pbc_dimensions(pbc_dimensions="z")
+
+        simulation.compute_friction_coefficient_via_green_kubo(
+            time_between_frames=1,
+            correlation_time=1000,
+            number_of_blocks=3,
+            start_time=1000,
+            end_time=4500,
+            frame_frequency=1,
+        )

@@ -717,11 +717,12 @@ class Simulation:
         tmp_position_universe = self.position_universes[0]
 
         # check if correlation time can be obtained with current trajectory:
-        if number_of_correlation_frames >= tmp_position_universe.trajectory.n_frames:
+        number_of_samples = int((end_frame - start_frame) / frame_frequency)
+        if number_of_correlation_frames >= number_of_samples:
             raise UnphysicalValue(
                 f" You want to compute a correlation based on {number_of_correlation_frames} frames."
-                f"However, the provided trajectory contains only {tmp_position_universe.trajectory.n_frames} frames.",
-                f" Please adjust your correlation time or run longer trajectories.",
+                f"However, the provided trajectory will only be analysed for {number_of_samples} frames.",
+                f" Please adjust your correlation or sampling times or run longer trajectories.",
             )
 
         # convert list to string for species and select atoms of these species:
@@ -729,7 +730,6 @@ class Simulation:
         atoms_selected = tmp_position_universe.select_atoms(f"name {selected_species_string}")
 
         # allocate array for all positions of all selected atoms for all frames sampled
-        number_of_samples = int((end_frame - start_frame) / frame_frequency)
         saved_positions_atoms_selected = np.zeros((number_of_samples, len(atoms_selected), 3))
 
         # allocate array for MSD, length of number_of_correlation_frames
@@ -854,6 +854,7 @@ class Simulation:
         self,
         time_between_frames: float,
         correlation_time: float = 1000.0,
+        number_of_blocks: int = 30,
         start_time: int = None,
         end_time: int = None,
         frame_frequency: int = None,
@@ -878,5 +879,59 @@ class Simulation:
         # the frame frequency
         number_of_correlation_frames = int(correlation_time / time_between_frames / frame_frequency)
 
+        # check if correlation time can be obtained with current trajectory:
+        number_of_samples = int((end_frame - start_frame) / frame_frequency)
+        if number_of_correlation_frames >= number_of_samples:
+            raise UnphysicalValue(
+                f" You want to compute a correlation based on {number_of_correlation_frames} frames."
+                f"However, the provided trajectory will only be analysed for {number_of_samples} frames.",
+                f" Please adjust your correlation or sampling times or run longer trajectories.",
+            )
+
         # get indices in which direction we would like to compute the frictino, usually along one or two axis
         direction_index = global_variables.DIMENSION_DICTIONARY[self.pbc_dimensions]
+
+        # allocate array for MSD, length of number_of_correlation_frames
+        correlated_summed_forces_summed_over_directions = np.zeros(number_of_correlation_frames)
+        # allocate array for number of samples per correlation frame
+        number_of_samples_correlated = np.zeros(number_of_correlation_frames)
+        # allocate array for blocks of MSD for statistical error analysis
+        correlated_summed_forces_summed_over_directions = np.zeros(
+            (number_of_blocks, number_of_correlation_frames)
+        )
+
+        # define how many samples are evaluated per block
+        number_of_samples_per_block = math.ceil(number_of_samples / number_of_blocks)
+        index_current_block_used = 0
+
+        # make sure that each block can reach full correlation time
+        if number_of_samples_per_block < number_of_correlation_frames:
+            raise UnphysicalValue(
+                f" Your chosen number of blocks ({number_of_blocks}) is not allowed as:",
+                f"samples per block ({number_of_samples_per_block}) < correlation frames {number_of_correlation_frames}.",
+                f"Please reduce the number of blocks or run longer trajectories.",
+            )
+
+        # Loop over summed forces in the desired direction
+        for frame, summed_forces_per_frame in enumerate(
+            tqdm(self.summed_forces[:, direction_index])
+        ):
+
+            # compute last frame sampled, i.e. usually frame+correlation frames
+            last_correlation_frame = frame + number_of_correlation_frames
+            if last_correlation_frame > number_of_samples - 1:
+                last_correlation_frame = number_of_samples
+
+            # define variable to save how many frames where used for correlation
+            number_of_frames_correlated = last_correlation_frame - frame
+
+            # increment which correlation frames were sampled
+            number_of_samples_correlated[0:number_of_frames_correlated] += 1
+
+            # compute autocorrelation of summed force, for now for each direction separately
+            autocorrelation_summed_forces = (
+                self.summed_forces[frame, direction_index]
+                * self.summed_forces[frame:last_correlation_frame, direction_index]
+            )
+
+            breakpoint()

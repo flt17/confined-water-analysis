@@ -2,6 +2,7 @@
 
 AVOGADRO = 6.0221409 * 1e23  # AVOGADRO CONSTANT
 
+
 DIMENSION_DICTIONARY = {  # DIMENSION DICTIONARY used to get indices based on direction
     "x": [0],
     "xy": [0, 1],
