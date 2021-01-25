@@ -306,7 +306,7 @@ class TestAnalysis_ComputeFrictionCoefficientViaGreenKubo:
         simulation = analysis.Simulation(path)
         simulation.read_in_simulation_data(read_positions=False, read_summed_forces=True)
 
-        simulation.set_pbc_dimensions(pbc_dimensions="z")
+        simulation.set_pbc_dimensions(pbc_dimensions="xy")
 
         simulation.compute_friction_coefficient_via_green_kubo(
             time_between_frames=1,
@@ -316,3 +316,5 @@ class TestAnalysis_ComputeFrictionCoefficientViaGreenKubo:
             end_time=4500,
             frame_frequency=1,
         )
+
+        assert simulation.friction_coefficients.get("ct: 1000")

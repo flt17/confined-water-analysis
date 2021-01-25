@@ -1,10 +1,21 @@
 # Just some global variables
 
-AVOGADRO = 6.0221409 * 1e23  # AVOGADRO CONSTANT
+# Scientific constants
+AVOGADRO = 6.0221409e23  # unit is 1/mol
+BOLTZMANN = 1.38064852e-23  # unit is J/K
 
 # Conversion factors
-HARTREE2EV = 27.21139664  # unit is eV/Ha
-BOHR2ANGSTROM = 1.0 / 0.52917726  # unit is A/B
+# Energy
+HARTREE_TO_EV = 27.21139664  # unit is eV/Ha
+EV_TO_JOULE = 1.602176565e-19  # unit is J/eV
+
+# Distance
+BOHR_TO_ANGSTROM = 1.0 / 0.52917726  # unit is A/B
+ANGSTROM_TO_METER = 1e-10  # unit is m/A
+
+# Time
+FEMTOSECOND_TO_SECOND = 1e-15  # unit is is fs/s
+
 
 DIMENSION_DICTIONARY = {  # DIMENSION DICTIONARY used to get indices based on direction
     "x": [0],

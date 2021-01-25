@@ -1,6 +1,7 @@
 import math
 import numpy as np
 import pandas
+import scipy
 import sys
 from tqdm.notebook import tqdm
 
@@ -86,6 +87,8 @@ class Simulation:
         self.density_profiles = {}
         self.hydrogen_bonding = []
         self.mean_squared_displacements = {}
+        self.autocorrelation_summed_forces = {}
+        self.friction_coefficients = {}
 
     def read_in_simulation_data(
         self,
@@ -157,7 +160,9 @@ class Simulation:
             # CP2K saves summed forces in atomic units, i.e. Ha/B.
             # Converte them into eV/A
             self.summed_forces = (
-                self.summed_forces * global_variables.HARTREE2EV / global_variables.BOHR2ANGSTROM
+                self.summed_forces
+                * global_variables.HARTREE_TO_EV
+                / global_variables.BOHR_TO_ANGSTROM
             )
 
     def set_pbc_dimensions(self, pbc_dimensions: str):
@@ -859,6 +864,7 @@ class Simulation:
     def compute_friction_coefficient_via_green_kubo(
         self,
         time_between_frames: float,
+        temperature: float = 330,
         correlation_time: float = 1000.0,
         number_of_blocks: int = 30,
         start_time: int = None,
@@ -870,6 +876,7 @@ class Simulation:
         Arguments:
             time_between_frames (float): Time (in fs) between frames where summed force was measured.
                                         This will substantially vary from the usual printing frequency.
+            temperature (float) : Simulation temperature in K.
             correlation_time (float) : Time (in fs) to correlate the summed forces, 1000 fs should be usually sufficient.
             start_time (int) : Start time for analysis (optional).
             end_time (int) : End time for analysis (optional).
@@ -898,11 +905,11 @@ class Simulation:
         direction_index = global_variables.DIMENSION_DICTIONARY[self.pbc_dimensions]
 
         # allocate array for MSD, length of number_of_correlation_frames
-        correlated_summed_forces_summed_over_directions = np.zeros(number_of_correlation_frames)
+        autocorrelation_total_summed_forces = np.zeros(number_of_correlation_frames)
         # allocate array for number of samples per correlation frame
         number_of_samples_correlated = np.zeros(number_of_correlation_frames)
         # allocate array for blocks of MSD for statistical error analysis
-        correlated_summed_forces_summed_over_directions = np.zeros(
+        autocorrelation_total_summed_forces_block = np.zeros(
             (number_of_blocks, number_of_correlation_frames)
         )
 
@@ -918,9 +925,12 @@ class Simulation:
                 f"Please reduce the number of blocks or run longer trajectories.",
             )
 
+        # determine in which direction the summed force will be correlated
+        summed_force_all_directions = self.summed_forces[:, direction_index]
+
         # Loop over summed forces in the desired direction
         for frame, summed_forces_per_frame in enumerate(
-            tqdm(self.summed_forces[:, direction_index])
+            tqdm((summed_force_all_directions[start_frame:end_frame])[::frame_frequency])
         ):
 
             # compute last frame sampled, i.e. usually frame+correlation frames
@@ -934,10 +944,108 @@ class Simulation:
             # increment which correlation frames were sampled
             number_of_samples_correlated[0:number_of_frames_correlated] += 1
 
-            # compute autocorrelation of summed force, for now for each direction separately
-            autocorrelation_summed_forces = (
-                self.summed_forces[frame, direction_index]
-                * self.summed_forces[frame:last_correlation_frame, direction_index]
+            # compute autocorrelation of summed force per frame, for now for each direction separately
+            autocorrelation_total_summed_forces_per_frame = np.sum(
+                summed_force_all_directions[frame, direction_index]
+                * summed_force_all_directions[frame:last_correlation_frame, direction_index],
+                axis=1,
             )
 
-            breakpoint()
+            # add to variable for ensemble average
+            autocorrelation_total_summed_forces[
+                0:number_of_frames_correlated
+            ] += autocorrelation_total_summed_forces_per_frame
+
+            # to get insight on the statistical error we compute block averages
+            autocorrelation_total_summed_forces_block[
+                index_current_block_used, 0:number_of_frames_correlated
+            ] += autocorrelation_total_summed_forces_per_frame
+
+            # close block when number of samples per block are reached
+            if (
+                frame + 1 >= (index_current_block_used + 1) * number_of_samples_per_block
+                or frame + 1 == number_of_samples
+            ):
+                # initialise with 0
+                number_of_samples_correlated_per_block = 0
+                # check how many samples per frame were taken for this block
+                if index_current_block_used == 0:
+                    # in first block this corresponds to the global number of samples correlated
+                    number_of_samples_correlated_per_block = number_of_samples_correlated
+                else:
+
+                    # in all others we just need to get the difference between current and previous global samples
+                    number_of_samples_correlated_per_block = (
+                        number_of_samples_correlated - previous_global_number_of_samples_correlated
+                    )
+
+                # average current block
+                autocorrelation_total_summed_forces_block[index_current_block_used, :] = (
+                    autocorrelation_total_summed_forces_block[index_current_block_used, :]
+                    / number_of_samples_correlated_per_block
+                )
+
+                # define previous global number of samples
+                previous_global_number_of_samples_correlated = number_of_samples_correlated.copy()
+
+                # increment index to move to next block
+                index_current_block_used += 1
+
+        # get average autocorrelation
+        average_autocorrelation_total_summed_forces = (
+            autocorrelation_total_summed_forces / number_of_samples_correlated
+        )
+
+        # compute statistical error based on block averags
+        std_autocorrelation_total_summed_forces = np.std(
+            autocorrelation_total_summed_forces_block, axis=0
+        )
+
+        # compute friction from obtained autocorrelation of summed forces by integrating over autcorrelation function
+        # IMPORTANT: the friction coefficient lambda will be expressed in 1E4 N s/m^3
+        # Compute prefactor for unit conversion
+        prefactor = (
+            (global_variables.EV_TO_JOULE / global_variables.ANGSTROM_TO_METER) ** 2
+            / len(direction_index)
+            * global_variables.FEMTOSECOND_TO_SECOND
+            / global_variables.BOLTZMANN
+            / temperature
+        )
+
+        # compute ensemble average of friction
+        average_friction_coefficient = (
+            scipy.integrate.cumtrapz(
+                average_autocorrelation_total_summed_forces,
+                dx=frame_frequency * time_between_frames,
+                initial=0.0,
+            )
+            * prefactor
+        )
+
+        # compute friction coefficient for each block
+        average_friction_coefficient_block = (
+            scipy.integrate.cumtrapz(
+                autocorrelation_total_summed_forces_block,
+                dx=frame_frequency * time_between_frames,
+                axis=1,
+                initial=0.0,
+            )
+            * prefactor
+        )
+
+        # based on these blocks compute std
+        std_friction_coefficient = np.std(average_friction_coefficient_block, axis=0)
+
+        # save all data to dictionary of class
+        string_for_dict = f"ct: {correlation_time}"
+        self.autocorrelation_summed_forces[string_for_dict] = [
+            np.arange(number_of_correlation_frames) * time_between_frames * frame_frequency,
+            average_autocorrelation_total_summed_forces,
+            std_autocorrelation_total_summed_forces,
+        ]
+
+        self.friction_coefficients[string_for_dict] = [
+            np.arange(number_of_correlation_frames) * time_between_frames * frame_frequency,
+            average_friction_coefficient,
+            std_friction_coefficient,
+        ]
