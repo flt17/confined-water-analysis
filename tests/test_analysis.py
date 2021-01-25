@@ -320,6 +320,4 @@ class TestAnalysis_ComputeFrictionCoefficientViaGreenKubo:
             frame_frequency=1,
         )
 
-        breakpoint()
-
         assert simulation.friction_coefficients.get("ct: 1000")
