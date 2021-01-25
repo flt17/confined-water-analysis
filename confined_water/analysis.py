@@ -154,6 +154,12 @@ class Simulation:
                 axis=0,
             )
 
+            # CP2K saves summed forces in atomic units, i.e. Ha/B.
+            # Converte them into eV/A
+            self.summed_forces = (
+                self.summed_forces * global_variables.HARTREE2EV / global_variables.BOHR2ANGSTROM
+            )
+
     def set_pbc_dimensions(self, pbc_dimensions: str):
         """
         Set in which direction pbc apply.

@@ -2,6 +2,9 @@
 
 AVOGADRO = 6.0221409 * 1e23  # AVOGADRO CONSTANT
 
+# Conversion factors
+HARTREE2EV = 27.21139664  # unit is eV/Ha
+BOHR2ANGSTROM = 1.0 / 0.52917726  # unit is A/B
 
 DIMENSION_DICTIONARY = {  # DIMENSION DICTIONARY used to get indices based on direction
     "x": [0],
