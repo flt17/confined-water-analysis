@@ -946,8 +946,8 @@ class Simulation:
 
             # compute autocorrelation of summed force per frame, for now for each direction separately
             autocorrelation_total_summed_forces_per_frame = np.sum(
-                summed_force_all_directions[frame, direction_index]
-                * summed_force_all_directions[frame:last_correlation_frame, direction_index],
+                summed_force_all_directions[frame]
+                * summed_force_all_directions[frame:last_correlation_frame],
                 axis=1,
             )
 
@@ -1002,7 +1002,9 @@ class Simulation:
         )
 
         # compute friction from obtained autocorrelation of summed forces by integrating over autcorrelation function
-        # IMPORTANT: the friction coefficient lambda will be expressed in 1E4 N s/m^3
+        # IMPORTANT: the friction coefficient lambda will be expressed in N s/m^3
+        # first: compute surface area of solid phase:
+        surface_area_solid = self._get_surface_area_of_solid_phase(direction_index)
         # Compute prefactor for unit conversion
         prefactor = (
             (global_variables.EV_TO_JOULE / global_variables.ANGSTROM_TO_METER) ** 2
@@ -1010,6 +1012,8 @@ class Simulation:
             * global_variables.FEMTOSECOND_TO_SECOND
             / global_variables.BOLTZMANN
             / temperature
+            / surface_area_solid
+            / global_variables.ANGSTROM_TO_METER ** 2
         )
 
         # compute ensemble average of friction
@@ -1049,3 +1053,92 @@ class Simulation:
             average_friction_coefficient,
             std_friction_coefficient,
         ]
+
+    def _get_surface_area_of_solid_phase(
+        self,
+        pbc_dimensions_indices: list,
+        start_time: int = None,
+        end_time: int = None,
+        frame_frequency: int = None,
+    ):
+        """
+        Compute the surface area of the solid phase of the system. This is readily done for sheets as
+        the area is simple the product of the box dimensions in the periodic directions. In case of
+        nanotubes, however, we need to determine the radius of the tube from the simulation. Obviously,
+        this requires a position universe trajectory to be read in previously.
+        Arguments:
+            pbc_dimensions_indices (list): List of indices of axes being periodic in the system.
+            start_time (int) : Start time for analysis (optional).
+            end_time (int) : End time for analysis (optional).
+            frame_frequency (int): Take every nth frame only (optional).
+        Returns:
+            surface_area_solid_phase (float): Surface area of the solid phase in A^2.
+        """
+
+        # dependent on pbc-dimensions compute surface area
+        if len(pbc_dimensions_indices) > 1:
+            # assume sheet
+            return np.prod(self.topology.get_cell_lengths_and_angles()[pbc_dimensions_indices])
+
+        else:
+            # in case we have a tube start sampling radius, i.e. distance from atom from center of mass
+
+            # get information about sampling
+            start_frame, end_frame, frame_frequency = self._get_sampling_frames(
+                start_time, end_time, frame_frequency
+            )
+
+            # determine which position universe are to be used in case of PIMD
+            # Thermodynamic properties are based on trajectory of replica
+            tmp_position_universes = (
+                self.position_universes
+                if len(self.position_universes) == 1
+                else self.position_universes[1::]
+            )
+
+            # loop over all universes
+            radii_sampled = []
+            for count_universe, universe in enumerate(tmp_position_universes):
+
+                radii_universe = []
+                # determine solid atoms, so far only B N C supported
+                solid_atoms = universe.select_atoms(f"name B N C")
+
+                # Loop over trajectory, as the radius should converge quickly we take only every 10th frame in comparison
+                # to the global settings
+                for count_frames, frames in enumerate(
+                    tqdm((universe.trajectory[start_frame:end_frame])[:: int(10 * frame_frequency)])
+                ):
+
+                    # determine center of mass:
+                    system_center_of_mass = np.ma.array(universe.atoms.center_of_mass())
+
+                    # use only in 2D (the directions confined)
+                    system_center_of_mass[pbc_dimensions_indices] = np.ma.masked
+                    reference_coordinates = system_center_of_mass.compressed()
+
+                    # get solid atoms coordinates in 2D
+                    solid_atoms_positions = np.ma.array(solid_atoms.positions)
+                    solid_atoms_positions[:, pbc_dimensions_indices] = np.ma.masked
+                    solid_atoms_positions_confined_directions = (
+                        solid_atoms_positions.compressed().reshape(-1, 2)
+                    )
+
+                    # compute radial distance of solid atoms in non-periodic directions from center of mass
+                    radial_distances_to_axis = np.linalg.norm(
+                        solid_atoms_positions_confined_directions - reference_coordinates, axis=1
+                    )
+
+                    radii_universe.append(np.mean(radial_distances_to_axis))
+
+                radii_sampled.append(np.mean(radii_universe))
+
+            # average radius of trajectory
+            average_radius = np.mean(radii_sampled)
+            # return surface area: 2*pi*circumference*length
+            return (
+                2
+                * np.pi
+                * average_radius
+                * self.topology.get_cell_lengths_and_angles()[pbc_dimensions_indices]
+            )
