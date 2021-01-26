@@ -83,6 +83,9 @@ class Simulation:
         # set system periodicity per default:
         self.set_pbc_dimensions("xyz")
 
+        # set default temperature to 330 K:
+        self.set_simulation_temperature(temperature=330)
+
         self.radial_distribution_functions = {}
         self.density_profiles = {}
         self.hydrogen_bonding = []
@@ -165,6 +168,18 @@ class Simulation:
                 * global_variables.HARTREE_TO_EV
                 / global_variables.BOHR_TO_ANGSTROM
             )
+
+    def set_simulation_temperature(self, temperature: float):
+        """
+        Set in temperature at which simulation was performed.
+        Arguments:
+            temperature (float) : Temperature (in K) at which simulation was performed.
+
+        Returns:
+
+        """
+
+        self.temperature = temperature
 
     def set_pbc_dimensions(self, pbc_dimensions: str):
         """
@@ -918,7 +933,6 @@ class Simulation:
     def compute_friction_coefficient_via_green_kubo(
         self,
         time_between_frames: float,
-        temperature: float = 330,
         correlation_time: float = 1000.0,
         number_of_blocks: int = 30,
         start_time: int = None,
@@ -930,10 +944,9 @@ class Simulation:
         Arguments:
             time_between_frames (float): Time (in fs) between frames where summed force was measured.
                                         This will substantially vary from the usual printing frequency.
-            temperature (float) : Simulation temperature in K.
             correlation_time (float) : Time (in fs) to correlate the summed forces, 1000 fs should be usually sufficient.
-
-
+            start_time (int) : Start time for analysis (optional).
+            end_time (int) : End time for analysis (optional).
             frame_frequency (int): Take every nth frame only (optional).
         Returns:
         """
@@ -1065,7 +1078,7 @@ class Simulation:
             / len(direction_index)
             * global_variables.FEMTOSECOND_TO_SECOND
             / global_variables.BOLTZMANN
-            / temperature
+            / self.temperature
             / surface_area_solid
             / global_variables.ANGSTROM_TO_METER ** 2
         )
