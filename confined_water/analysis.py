@@ -741,15 +741,14 @@ class Simulation:
         # if this is the case we simply need to trace allocate only one thrid of the number of atoms
         selected_species_string = " ".join(species)
         atoms_selected = tmp_position_universe.select_atoms(f"name {selected_species_string}")
-
-        # number_of_tracers = (
-        #     int(len(atoms_selected) / 3)
-        #     if selected_species_string == "O H"
-        #     else len(atoms_selected)
-        # )
+        number_of_tracers = (
+            int(len(atoms_selected) / 3)
+            if selected_species_string == "O H"
+            else len(atoms_selected)
+        )
 
         # allocate array for all positions of all selected atoms for all frames sampled
-        saved_positions_atoms_selected = np.zeros((number_of_samples, len(atoms_selected), 3))
+        saved_positions_atoms_selected = np.zeros((number_of_samples, number_of_tracers, 3))
 
         # allocate array for MSD, length of number_of_correlation_frames
         mean_squared_displacement = np.zeros(number_of_correlation_frames)
@@ -773,7 +772,7 @@ class Simulation:
 
         # Loop over trajectory to sample all positions of selected atoms
         for count_frames, frames in enumerate(
-            (tmp_position_universe.trajectory[start_frame:end_frame])[::frame_frequency]
+            tqdm((tmp_position_universe.trajectory[start_frame:end_frame])[::frame_frequency])
         ):
             # This shouldn't be necessary as we should only use wrapped trajectories
             # Leaving it in as it is cheap and better safe than sorry
@@ -786,8 +785,23 @@ class Simulation:
             # If the input file has another format this will lead to errorneous results and
             # it would be better to just trace the oxygens.
 
-            # fill array with positions
-            saved_positions_atoms_selected[count_frames] = atoms_selected.positions
+            if selected_species_string == "O H":
+                # compute center of mass of water molecules
+                center_of_masses_water_molecules = np.asarray(
+                    [
+                        utils.get_center_of_mass_of_atoms_in_accordance_with_MIC(
+                            atoms_selected[3 * index_molecule : 3 * index_molecule + 3],
+                            self.topology,
+                            self.pbc_dimensions,
+                        )
+                        for index_molecule in np.arange(number_of_tracers)
+                    ]
+                )
+
+                saved_positions_atoms_selected[count_frames] = center_of_masses_water_molecules
+            else:
+                # fill array with positions
+                saved_positions_atoms_selected[count_frames] = atoms_selected.positions
 
         # used the saved positions to now compute MSD
         # first check if water diffusion is calculated, i.e. O-H as species name

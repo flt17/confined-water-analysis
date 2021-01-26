@@ -249,7 +249,24 @@ class TestAnalysis_ComputeMeanSquaredDisplacement:
                 ["O", "H"], correlation_time=1000, number_of_blocks=20
             )
 
-    def test_returns_MSD_for_bulk_water(self):
+    def test_returns_MSD_for_bulk_water_only_oxygen(self):
+        path = "./files/bulk_water/classical"
+
+        topology_name = "revPBE0-D3-w64-T300K-1bar"
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True, topology_file_name=topology_name)
+
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+        simulation.compute_mean_squared_displacement(
+            ["O"], correlation_time=200, number_of_blocks=5
+        )
+
+        assert simulation.mean_squared_displacements.get("O - ct: 200")
+
+    def test_returns_MSD_for_bulk_water_based_on_water_COM(self):
         path = "./files/bulk_water/classical"
 
         topology_name = "revPBE0-D3-w64-T300K-1bar"
