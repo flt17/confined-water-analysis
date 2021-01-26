@@ -300,3 +300,57 @@ def compute_diffusion_coefficient_based_on_MSD(
         * global_variables.ANGSTROM_TO_METER ** 2
         / global_variables.FEMTOSECOND_TO_SECOND
     )
+
+
+def compute_finite_size_correction_for_diffusion_coefficient_of_bulk_fluid(
+    topology, fluid: str = "water", temperature: float = 330
+):
+    """
+    Return finite size correction for diffusion coefficient for bulk fluids, e.g. water.
+    Arguments:
+        topology of the system: ASE atoms object containing information on system dimensions.
+        fluid (str): Name of the fluid we want to compute the correction.
+        temperature (float): Temperature at which we would like to compute the correction.
+    Returns:
+        finite_size_correction_diffusion (float): Correction for the finite size of the system in  m^2/s.
+    """
+
+    # determine format of simulation box
+    box_shape = (
+        "cubic"
+        if len(np.unique(topology.get_cell_lengths_and_angles()[0:3])) == 1
+        and np.all(topology.get_cell_lengths_and_angles()[3::] == 90)
+        else ""
+    )
+
+    # get prefactor from dictionary
+    prefactor = global_variables.PREFACTOR_DIFFUSION_CORRECTION_BASED_ON_BOX_SHAPE_DICTIONARY.get(
+        box_shape
+    )
+    # check that box shape is known, so far only cubic
+    if not prefactor:
+        raise UndefinedOption(
+            f"Specified box shape {box_shape} is unknown.",
+            f" Possible options are {global_variables.PREFACTOR_DIFFUSION_CORRECTION_BASED_ON_BOX_SHAPE_DICTIONARY.keys()}",
+        )
+
+    # get viscosity of fluid chosen
+    viscosity = global_variables.EXP_VISCOSITIES_BULK_FLUIDS.get(fluid)
+    if not viscosity:
+        raise UndefinedOption(
+            f"Specified fluid {fluid} is unknown.",
+            f" Possible options are {global_variables.EXP_VISCOSITIES_BULK_FLUIDS.keys()}",
+        )
+
+    return (
+        prefactor
+        * global_variables.BOLTZMANN
+        * temperature
+        / (
+            6
+            * np.pi
+            * viscosity
+            * topology.get_cell_lengths_and_angles()[0]
+            * global_variables.ANGSTROM_TO_METER
+        )
+    )

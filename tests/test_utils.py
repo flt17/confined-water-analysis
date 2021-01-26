@@ -202,3 +202,62 @@ class TestApplyMinimumImageConventionToInteratomicVectors:
             )
 
             assert diffusion_coefficient
+
+    class TestComputeFiniteSizeCorrectionForDiffusionCoefficientOfBulkFluid:
+        def test_raises_error_when_unknown_box_shape(self):
+            path = "./files/bulk_water/classical"
+
+            topology_name = "revPBE0-D3-w64-T300K-1bar"
+            simulation = analysis.Simulation(path)
+
+            simulation.read_in_simulation_data(
+                read_positions=True, topology_file_name=topology_name
+            )
+            arbitrary_cell = 2 * np.identity(3)
+            arbitrary_cell[0, 1] = 5
+
+            simulation.topology.set_cell(arbitrary_cell)
+
+            with pytest.raises(utils.UndefinedOption):
+                correction = (
+                    utils.compute_finite_size_correction_for_diffusion_coefficient_of_bulk_fluid(
+                        simulation.topology, fluid="water", temperature=330
+                    )
+                )
+
+        def test_raises_error_when_unknown_fluid(self):
+            path = "./files/bulk_water/classical"
+
+            topology_name = "revPBE0-D3-w64-T300K-1bar"
+            simulation = analysis.Simulation(path)
+
+            simulation.read_in_simulation_data(
+                read_positions=True, topology_file_name=topology_name
+            )
+
+            with pytest.raises(utils.UndefinedOption):
+                correction = (
+                    utils.compute_finite_size_correction_for_diffusion_coefficient_of_bulk_fluid(
+                        simulation.topology, fluid="hexane", temperature=330
+                    )
+                )
+
+        def test_returns_correction(self):
+            path = "./files/bulk_water/classical"
+
+            topology_name = "revPBE0-D3-w64-T300K-1bar"
+            simulation = analysis.Simulation(path)
+
+            simulation.read_in_simulation_data(
+                read_positions=True, topology_file_name=topology_name
+            )
+
+            correction = (
+                utils.compute_finite_size_correction_for_diffusion_coefficient_of_bulk_fluid(
+                    simulation.topology, fluid="water", temperature=330
+                )
+            )
+
+            assert correction
+
+            # assert

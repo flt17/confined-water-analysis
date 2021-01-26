@@ -16,8 +16,8 @@ ANGSTROM_TO_METER = 1e-10  # unit is m/A
 # Time
 FEMTOSECOND_TO_SECOND = 1e-15  # unit is is fs/s
 
-
-DIMENSION_DICTIONARY = {  # DIMENSION DICTIONARY used to get indices based on direction
+# Dictionaries
+DIMENSION_DICTIONARY = {
     "x": [0],
     "xy": [0, 1],
     "xz": [0, 2],
@@ -26,3 +26,8 @@ DIMENSION_DICTIONARY = {  # DIMENSION DICTIONARY used to get indices based on di
     "z": [2],
     "xyz": [0, 1, 2],
 }
+
+PREFACTOR_DIFFUSION_CORRECTION_BASED_ON_BOX_SHAPE_DICTIONARY = {"cubic": 2.837297}
+
+# in Pa*s
+EXP_VISCOSITIES_BULK_FLUIDS = {"water": 0.8925e-3}
