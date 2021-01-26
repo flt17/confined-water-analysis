@@ -177,3 +177,28 @@ class TestApplyMinimumImageConventionToInteratomicVectors:
             assert np.all(
                 center_of_mass_MIC <= simulation.topology.get_cell_lengths_and_angles()[0:3]
             ) and np.all(center_of_mass_MIC >= np.zeros(3))
+
+    class TestComputeDiffusionCoefficientBasedOnMSD:
+        def test_returns_correct_diffusion_coefficient(self):
+            path = "./files/bulk_water/classical"
+
+            topology_name = "revPBE0-D3-w64-T300K-1bar"
+            simulation = analysis.Simulation(path)
+
+            simulation.read_in_simulation_data(
+                read_positions=True, topology_file_name=topology_name
+            )
+
+            simulation.set_sampling_times(
+                start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+            )
+            simulation.compute_mean_squared_displacement(
+                ["O", "H"], correlation_time=200, number_of_blocks=5
+            )
+
+            diffusion_coefficient = utils.compute_diffusion_coefficient_based_on_MSD(
+                simulation.mean_squared_displacements["O H - ct: 200"][1],
+                simulation.mean_squared_displacements["O H - ct: 200"][0],
+            )
+
+            assert diffusion_coefficient

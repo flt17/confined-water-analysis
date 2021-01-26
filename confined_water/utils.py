@@ -1,6 +1,9 @@
 import glob
+import math
 import numpy as np
 import os
+import scipy
+from scipy import stats
 import sys
 
 import ase
@@ -248,3 +251,52 @@ def get_center_of_mass_of_atoms_in_accordance_with_MIC(
     ] += topology.get_cell_lengths_and_angles()[np.where(com_MIC_in_box < np.zeros(3))]
 
     return com_MIC_in_box
+
+
+def compute_diffusion_coefficient_based_on_MSD(
+    measured_msd: np.array,
+    measured_time: np.array,
+    start_time_fit: float = None,
+    end_time_fit: float = None,
+):
+    """
+    Return diffusion coefficient based on mean squared displacement.
+    Arguments:
+        measured_msd (np.array): Mean squared displacement measured from trajectory.
+        measurement_time (np.array): Time array for which the MSD was measured.
+        start_time_fit (float) : Start time (in fs) for linear fit (optional). Default is 20% of time measured.
+        end_time_fit (float) : End time (in fs) for linear fit (optional). Default is end of the measurment.
+    Returns:
+        diffusion_coefficient (float): Diffusion coefficient in m^2/s.
+    """
+
+    # determine interval between measurements in fs:
+    time_interval_measurements = measured_time[1] - measured_time[0]
+
+    # determine start and end time for fit:
+    start_time_fit = start_time_fit if start_time_fit else (0.2 * measured_time[-1])
+    end_time_fit = end_time_fit if end_time_fit else measured_time[-1]
+
+    # convert times into frames
+    start_frame_fit = math.ceil(start_time_fit / time_interval_measurements)
+    end_frame_fit = int(end_time_fit / time_interval_measurements + 1)
+
+    # linear regression to data selected, we are only interested in slope and the quality of the fit.
+    fit_slope, __, fit_r_value, __, fit_std_err = scipy.stats.linregress(
+        measured_time[start_frame_fit:end_frame_fit], measured_msd[start_frame_fit:end_frame_fit]
+    )
+
+    # tell user if fit isn't sufficiently accurate.
+    if fit_r_value ** 2 < 0.95:
+        print(
+            f"WARNING: The linear fit to the mean squared displacement showed an r2 score of {fit_r_value**2}.",
+            f"We recommend to increase the run time of the trajectory or change the fitting settings.",
+        )
+
+    # return diffusion coefficient based on slope in m^2 /s
+    return (
+        fit_slope
+        / 6
+        * global_variables.ANGSTROM_TO_METER ** 2
+        / global_variables.FEMTOSECOND_TO_SECOND
+    )
