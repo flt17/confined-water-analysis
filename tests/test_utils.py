@@ -170,6 +170,10 @@ class TestApplyMinimumImageConventionToInteratomicVectors:
 
             water_molecule_58 = water_atoms[174:177]
 
-            center_of_masses_MIC = utils.get_center_of_mass_of_atoms_in_accordance_with_MIC(
+            center_of_mass_MIC = utils.get_center_of_mass_of_atoms_in_accordance_with_MIC(
                 water_molecule_58, simulation.topology, dimension="xyz"
             )
+
+            assert np.all(
+                center_of_mass_MIC <= simulation.topology.get_cell_lengths_and_angles()[0:3]
+            ) and np.all(center_of_mass_MIC >= np.zeros(3))

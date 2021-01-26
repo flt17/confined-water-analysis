@@ -232,19 +232,19 @@ def get_center_of_mass_of_atoms_in_accordance_with_MIC(
     tmp_atom_group.positions = positions_MIC
 
     # compute center of mass via MDAnalysis
-    com_MIC = tmp_atom_group.center_of_mass()
+    com_MIC_in_box = tmp_atom_group.center_of_mass()
 
     # wrap COM inside box
     # above cell lengths, only orthorombic
     com_MIC_in_box[
-        np.where(com_MIC_in_box > topology.get_cell_lengths_and_angles())
+        np.where(com_MIC_in_box > topology.get_cell_lengths_and_angles()[0:3])
     ] -= topology.get_cell_lengths_and_angles()[
-        np.where(com_MIC_in_box > topology.get_cell_lengths_and_angles())
+        np.where(com_MIC_in_box > topology.get_cell_lengths_and_angles()[0:3])
     ]
 
     # negative values
     com_MIC_in_box[
         np.where(com_MIC_in_box < np.zeros(3))
-    ] += topology.get_cell_lengths_and_angles()[np.where(com_MIC_in_box > np.zeros(3))]
+    ] += topology.get_cell_lengths_and_angles()[np.where(com_MIC_in_box < np.zeros(3))]
 
     return com_MIC_in_box
