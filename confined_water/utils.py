@@ -172,7 +172,7 @@ def apply_minimum_image_convention_to_interatomic_vectors(
 
     Arguments:
         vectors (np.array): Vectors between atoms.
-        lattice_vector_a (np.array): Lattice vectors of simulation box.
+        lattice_vectors (np.array): Lattice vectors of simulation box.
         dimension (str) : to speed up calculatio only perform transformation in the periodic direction.
 
 
@@ -197,3 +197,54 @@ def apply_minimum_image_convention_to_interatomic_vectors(
 
     vectors_MIC = vectors
     return vectors_MIC
+
+
+def get_center_of_mass_of_atoms_in_accordance_with_MIC(
+    atom_group,
+    topology,
+    dimension: str = "xyz",
+):
+    """
+    Return center of mass in passed simulation box for a given atom group.
+    Arguments:
+        atom_group (): Atoms with given coordinates and mass.
+        lattice_vectors(ase atoms object): Topology of the system, i.e. cell lengths etc..
+        dimension (str) : to speed up calculatio only perform transformation in the periodic direction.
+    Returns:
+        center_of_mass_pbc (np.array): Center of mass in accordance with pbc.
+    """
+
+    # create copy of atom group
+    tmp_atom_group = atom_group.copy()
+
+    # compute vectors from first atom of atom group to remaining atoms
+    vectors_first_to_rest = tmp_atom_group.positions - tmp_atom_group[0].position
+
+    # make this vector MIC conform
+    vectors_first_to_rest_MIC = apply_minimum_image_convention_to_interatomic_vectors(
+        vectors_first_to_rest, topology.cell, dimension
+    )
+
+    # compute new positions which will then be used for center of mass
+    positions_MIC = tmp_atom_group[0].position + vectors_first_to_rest_MIC
+
+    # save these to the tmp atom group
+    tmp_atom_group.positions = positions_MIC
+
+    # compute center of mass via MDAnalysis
+    com_MIC = tmp_atom_group.center_of_mass()
+
+    # wrap COM inside box
+    # above cell lengths, only orthorombic
+    com_MIC_in_box[
+        np.where(com_MIC_in_box > topology.get_cell_lengths_and_angles())
+    ] -= topology.get_cell_lengths_and_angles()[
+        np.where(com_MIC_in_box > topology.get_cell_lengths_and_angles())
+    ]
+
+    # negative values
+    com_MIC_in_box[
+        np.where(com_MIC_in_box < np.zeros(3))
+    ] += topology.get_cell_lengths_and_angles()[np.where(com_MIC_in_box > np.zeros(3))]
+
+    return com_MIC_in_box

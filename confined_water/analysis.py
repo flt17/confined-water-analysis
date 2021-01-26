@@ -737,8 +737,16 @@ class Simulation:
             )
 
         # convert list to string for species and select atoms of these species:
+        # to get water diffusion we need to look at the movement of the center of mass of the molecule
+        # if this is the case we simply need to trace allocate only one thrid of the number of atoms
         selected_species_string = " ".join(species)
         atoms_selected = tmp_position_universe.select_atoms(f"name {selected_species_string}")
+
+        # number_of_tracers = (
+        #     int(len(atoms_selected) / 3)
+        #     if selected_species_string == "O H"
+        #     else len(atoms_selected)
+        # )
 
         # allocate array for all positions of all selected atoms for all frames sampled
         saved_positions_atoms_selected = np.zeros((number_of_samples, len(atoms_selected), 3))
@@ -773,10 +781,17 @@ class Simulation:
                 box=self.topology.get_cell_lengths_and_angles(), inplace=True
             )
 
+            # if water diffusion compute center of mass per water molecule
+            # Based on CP2K input this is readily done due to the the H-H-O input structure
+            # If the input file has another format this will lead to errorneous results and
+            # it would be better to just trace the oxygens.
+
             # fill array with positions
             saved_positions_atoms_selected[count_frames] = atoms_selected.positions
 
         # used the saved positions to now compute MSD
+        # first check if water diffusion is calculated, i.e. O-H as species name
+
         # Loop over saved positions
         for frame, positions_per_frame in enumerate(tqdm(saved_positions_atoms_selected)):
 

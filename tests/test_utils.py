@@ -150,3 +150,26 @@ class TestApplyMinimumImageConventionToInteratomicVectors:
             np.min(vectors_MIC) >= -simulation.topology.cell[0][0] / 2 * 1.0005
             and np.max(vectors_MIC) <= simulation.topology.cell[0][0] / 2 * 1.0005
         )
+
+    class TestGetCenterOfMassInAccordanceWithMIC:
+        def test_returns_correct_center_of_masses(self):
+            path = "./files/bulk_water/classical"
+
+            topology_name = "revPBE0-D3-w64-T300K-1bar"
+            simulation = analysis.Simulation(path)
+
+            simulation.read_in_simulation_data(
+                read_positions=True, topology_file_name=topology_name
+            )
+
+            water_atoms = simulation.position_universes[0].select_atoms("name O H")
+
+            water_atoms.pack_into_box(
+                box=simulation.topology.get_cell_lengths_and_angles(), inplace=True
+            )
+
+            water_molecule_58 = water_atoms[174:177]
+
+            center_of_masses_MIC = utils.get_center_of_mass_of_atoms_in_accordance_with_MIC(
+                water_molecule_58, simulation.topology, dimension="xyz"
+            )
