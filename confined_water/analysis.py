@@ -87,6 +87,7 @@ class Simulation:
         self.density_profiles = {}
         self.hydrogen_bonding = []
         self.mean_squared_displacements = {}
+        self.diffusion_coefficients = {}
         self.autocorrelation_summed_forces = {}
         self.friction_coefficients = {}
 
@@ -876,18 +877,42 @@ class Simulation:
                 # increment index to move to next block
                 index_current_block_used += 1
 
+        # define time:
+        measured_time = (
+            np.arange(number_of_correlation_frames) * self.time_between_frames * frame_frequency
+        )
+
         # get average MSD
         average_mean_squared_displacement = mean_squared_displacement / number_of_samples_correlated
 
         # compute statistical error based on block averags
         std_mean_squared_displacement = np.std(mean_squared_displacement_blocks, axis=0)
 
+        # compute diffusion coefficients
+        average_diffusion_coefficient = utils.compute_diffusion_coefficient_based_on_MSD(
+            average_mean_squared_displacement, measured_time
+        )
+
+        diffusion_coefficient_block = np.asarray(
+            [
+                utils.compute_diffusion_coefficient_based_on_MSD(MSD_per_block, measured_time)
+                for MSD_per_block in mean_squared_displacement_blocks
+            ]
+        )
+
+        std_diffusion_coefficient = np.std(diffusion_coefficient_block)
+
         # save all data to dictionary of class
         string_for_dict = f"{selected_species_string} - ct: {correlation_time}"
         self.mean_squared_displacements[string_for_dict] = [
-            np.arange(number_of_correlation_frames) * self.time_between_frames * frame_frequency,
+            measured_time,
             average_mean_squared_displacement,
             std_mean_squared_displacement,
+        ]
+
+        self.diffusion_coefficients[string_for_dict] = [
+            average_diffusion_coefficient,
+            std_diffusion_coefficient,
         ]
 
     def compute_friction_coefficient_via_green_kubo(
@@ -907,8 +932,8 @@ class Simulation:
                                         This will substantially vary from the usual printing frequency.
             temperature (float) : Simulation temperature in K.
             correlation_time (float) : Time (in fs) to correlate the summed forces, 1000 fs should be usually sufficient.
-            start_time (int) : Start time for analysis (optional).
-            end_time (int) : End time for analysis (optional).
+
+
             frame_frequency (int): Take every nth frame only (optional).
         Returns:
         """
