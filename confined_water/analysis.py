@@ -84,7 +84,7 @@ class Simulation:
         self.set_pbc_dimensions("xyz")
 
         # set default temperature to 330 K:
-        self.set_simulation_temperature(temperature=330)
+        self.set_simulation_temperature(330)
 
         self.radial_distribution_functions = {}
         self.density_profiles = {}

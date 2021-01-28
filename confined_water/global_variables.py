@@ -10,7 +10,7 @@ HARTREE_TO_EV = 27.21139664  # unit is eV/Ha
 EV_TO_JOULE = 1.602176565e-19  # unit is J/eV
 
 # Distance
-BOHR_TO_ANGSTROM = 1.0 / 0.52917726  # unit is A/B
+BOHR_TO_ANGSTROM = 0.52917726  # unit is A/B
 ANGSTROM_TO_METER = 1e-10  # unit is m/A
 
 # Time
