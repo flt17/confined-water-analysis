@@ -46,6 +46,16 @@ class TestSimulationReadInSimulationData:
 
         assert np.all(simulation.summed_forces)
 
+    def test_sets_up_velocity_universe_for_classical_simulation(self):
+        path = "./files/water_in_carbon_nanotube/classical"
+
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(
+            read_positions=False, read_velocities=True, read_summed_forces=False
+        )
+        assert len(simulation.velocity_universes) == 1
+
 
 class TestConfinedWaterSystemAddSimulation:
     def test_returns_added_simulation(self):
