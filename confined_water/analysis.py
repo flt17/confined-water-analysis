@@ -790,16 +790,14 @@ class Simulation:
         for count_frames, frames in enumerate(
             tqdm((tmp_position_universe.trajectory[start_frame:end_frame])[::frame_frequency])
         ):
-            # This shouldn't be necessary as we should only use wrapped trajectories
-            # Leaving it in as it is cheap and better safe than sorry
-            atoms_selected.pack_into_box(
-                box=self.topology.get_cell_lengths_and_angles(), inplace=True
-            )
 
             # if water diffusion compute center of mass per water molecule
             # Based on CP2K input this is readily done due to the the H-H-O input structure
             # If the input file has another format this will lead to errorneous results and
             # it would be better to just trace the oxygens.
+
+            # compute center of mass of selected atoms, which will be  substracted afterwards
+            center_of_mass_selected_atoms = atoms_selected.center_of_mass()
 
             if selected_species_string == "O H":
                 # compute center of mass of water molecules
@@ -814,10 +812,14 @@ class Simulation:
                     ]
                 )
 
-                saved_positions_atoms_selected[count_frames] = center_of_masses_water_molecules
+                saved_positions_atoms_selected[count_frames] = (
+                    center_of_masses_water_molecules - center_of_mass_selected_atoms
+                )
             else:
                 # fill array with positions
-                saved_positions_atoms_selected[count_frames] = atoms_selected.positions
+                saved_positions_atoms_selected[count_frames] = (
+                    atoms_selected.positions - center_of_mass_selected_atoms
+                )
 
         # used the saved positions to now compute MSD
         # first check if water diffusion is calculated, i.e. O-H as species name
@@ -842,14 +844,9 @@ class Simulation:
                 - saved_positions_atoms_selected[frame]
             )
 
-            # apply minimum image convention to these vectors
-            vectors_atom_movement_MIC = utils.apply_minimum_image_convention_to_interatomic_vectors(
-                vectors_atom_movement, self.topology.cell, self.pbc_dimensions
-            )
-
             # compute squared_distance of the moved atoms between each frame
             squared_distances_atom_movement = np.square(
-                np.linalg.norm(vectors_atom_movement_MIC, axis=2)
+                np.linalg.norm(vectors_atom_movement, axis=2)
             )
 
             # add contributions to array (for correlations frames sampled)
