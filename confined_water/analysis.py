@@ -97,6 +97,7 @@ class Simulation:
     def read_in_simulation_data(
         self,
         read_positions: bool = True,
+        read_velocities: bool = False,
         read_summed_forces: bool = False,
         topology_file_name: str = None,
     ):
@@ -130,6 +131,20 @@ class Simulation:
             )
 
             self.species_in_system = np.unique(self.position_universes[0].atoms.names)
+
+        # Velocity trajectory, can be one ore multiple. If more than one, first element is centroid.
+        # Functions which compute a specific property will choose which universe is picked in case of PIMD.
+        if read_velocities:
+            universes = utils.get_mdanalysis_universe(
+                self.directory_path, "velocities", topology_file_name
+            )
+
+            # to make sure self.position_universes is always a list of MDAnalysis Universes
+            self.velocity_universes = (
+                universes if isinstance(universes, list) == True else [universes]
+            )
+
+            self.species_in_system = np.unique(self.velocity_universes[0].atoms.names)
 
         # Summed force (usually for solids), can be one ore multiple. If more than one, they should be averaged for each step.
         # It is quite likely that the timestep between samples is lower than the usual printing frequency.
@@ -926,6 +941,60 @@ class Simulation:
             average_diffusion_coefficient,
             std_diffusion_coefficient,
         ]
+
+    def compute_velocity_autocorrelation_function(self):
+        """
+        Compute velocity autocorrelation function (VACF) for given species.
+        Arguments:
+            species (list) : Elements considered for VACF.
+            correlation_time (float): Time (in fs) for which we will trace the movement of the atoms.
+            number_of_blocks (int): Number of blocks used for block average of VACF.
+            start_time (int) : Start time for analysis (optional).
+            end_time (int) : End time for analysis (optional).
+            frame_frequency (int): Take every nth frame only (optional).
+        Returns:
+
+        """
+
+        # get information about sampling either from given arguments or previously set
+        start_frame, end_frame, frame_frequency = self._get_sampling_frames(
+            start_time, end_time, frame_frequency, time_between_frames
+        )
+
+        # convert correlation_time to correlation_frames taken into account the time between frames and
+        # the frame frequency
+        number_of_correlation_frames = int(correlation_time / time_between_frames / frame_frequency)
+
+        # check if correlation time can be obtained with current trajectory:
+        number_of_samples = int((end_frame - start_frame) / frame_frequency)
+        if number_of_correlation_frames >= number_of_samples:
+            raise UnphysicalValue(
+                f" You want to compute a correlation based on {number_of_correlation_frames} frames."
+                f"However, the provided trajectory will only be analysed for {number_of_samples} frames.",
+                f" Please adjust your correlation or sampling times or run longer trajectories.",
+            )
+
+        # allocate array for VACF, length of number_of_correlation_frames
+        # 4 rows are used to save all directions and total VACF
+        VACF_ = np.zeros((4, number_of_correlation_frames))
+
+        # allocate array for number of samples per correlation frame
+        number_of_samples_correlated = np.zeros(number_of_correlation_frames)
+
+        # allocate array for blocks of VACF for statistical error analysis
+        VACF_block = np.zeros((number_of_blocks, 4, number_of_correlation_frames))
+
+        # define how many samples are evaluated per block
+        number_of_samples_per_block = math.ceil(number_of_samples / number_of_blocks)
+        index_current_block_used = 0
+
+        # make sure that each block can reach full correlation time
+        if number_of_samples_per_block < number_of_correlation_frames:
+            raise UnphysicalValue(
+                f" Your chosen number of blocks ({number_of_blocks}) is not allowed as:",
+                f"samples per block ({number_of_samples_per_block}) < correlation frames {number_of_correlation_frames}.",
+                f"Please reduce the number of blocks or run longer trajectories.",
+            )
 
     def compute_friction_coefficient_via_green_kubo(
         self,
