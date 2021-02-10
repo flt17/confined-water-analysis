@@ -93,6 +93,8 @@ class Simulation:
         self.diffusion_coefficients = {}
         self.autocorrelation_summed_forces = {}
         self.friction_coefficients = {}
+        self.velocity_autocorrelation_function = {}
+        self.diffusion_coefficients_via_GK = {}
 
     def read_in_simulation_data(
         self,
@@ -816,17 +818,20 @@ class Simulation:
 
             if selected_species_string == "O H":
                 # compute center of mass of water molecules
-                center_of_masses_water_molecules = np.asarray(
-                    [
-                        utils.get_center_of_mass_of_atoms_in_accordance_with_MIC(
-                            atoms_selected[3 * index_molecule : 3 * index_molecule + 3],
-                            self.topology,
-                            self.pbc_dimensions,
-                        )
-                        for index_molecule in np.arange(number_of_tracers)
-                    ]
-                )
-
+                center_of_masses_water_molecules = [
+                    atoms_selected[3 * index_molecule : 3 * index_molecule + 3].center_of_mass()
+                    for index_molecule in np.arange(number_of_tracers)
+                ]
+                # center_of_masses_water_molecules = np.asarray(
+                #     [
+                #         utils.get_center_of_mass_of_atoms_in_accordance_with_MIC(
+                #             atoms_selected[3 * index_molecule : 3 * index_molecule + 3],
+                #             self.topology,
+                #             self.pbc_dimensions,
+                #         )
+                #         for index_molecule in np.arange(number_of_tracers)
+                #     ]
+                # )
                 saved_positions_atoms_selected[count_frames] = (
                     center_of_masses_water_molecules - center_of_mass_selected_atoms
                 )
@@ -935,6 +940,7 @@ class Simulation:
             measured_time,
             average_mean_squared_displacement,
             std_mean_squared_displacement,
+            mean_squared_displacement_blocks,
         ]
 
         self.diffusion_coefficients[string_for_dict] = [
@@ -942,13 +948,24 @@ class Simulation:
             std_diffusion_coefficient,
         ]
 
-    def compute_velocity_autocorrelation_function(self):
+    def compute_diffusion_coefficient_via_green_kubo(
+        self,
+        species: list,
+        correlation_time: float = 5000.0,
+        number_of_blocks: int = 30,
+        units_velocity: str = "a.u.",
+        start_time: int = None,
+        end_time: int = None,
+        frame_frequency: int = None,
+    ):
         """
-        Compute velocity autocorrelation function (VACF) for given species.
+        Compute velocity autocorrelation function (VACF) for given species and returns diffusion
+        coefficient in all directions and the total average.
         Arguments:
             species (list) : Elements considered for VACF.
             correlation_time (float): Time (in fs) for which we will trace the movement of the atoms.
             number_of_blocks (int): Number of blocks used for block average of VACF.
+            units_velocity (str): In which unit where velocities saved.
             start_time (int) : Start time for analysis (optional).
             end_time (int) : End time for analysis (optional).
             frame_frequency (int): Take every nth frame only (optional).
@@ -958,12 +975,18 @@ class Simulation:
 
         # get information about sampling either from given arguments or previously set
         start_frame, end_frame, frame_frequency = self._get_sampling_frames(
-            start_time, end_time, frame_frequency, time_between_frames
+            start_time, end_time, frame_frequency
         )
 
         # convert correlation_time to correlation_frames taken into account the time between frames and
         # the frame frequency
-        number_of_correlation_frames = int(correlation_time / time_between_frames / frame_frequency)
+        number_of_correlation_frames = int(
+            correlation_time / self.time_between_frames / frame_frequency
+        )
+
+        # determine which velocity universes are to be used in case of PIMD
+        # Dynamical properties are based on trajectory of centroid!
+        tmp_velocity_universe = self.velocity_universes[0]
 
         # check if correlation time can be obtained with current trajectory:
         number_of_samples = int((end_frame - start_frame) / frame_frequency)
@@ -974,15 +997,28 @@ class Simulation:
                 f" Please adjust your correlation or sampling times or run longer trajectories.",
             )
 
+        # convert list to string for species and select atoms of these species:
+        # to get water diffusion we need to look at the movement of the center of mass of the molecule
+        # if this is the case we simply need to trace allocate only one thrid of the number of atoms
+        selected_species_string = " ".join(species)
+        atoms_selected = tmp_velocity_universe.select_atoms(f"name {selected_species_string}")
+        number_of_tracers = (
+            int(len(atoms_selected) / 3)
+            if selected_species_string == "O H"
+            else len(atoms_selected)
+        )
+
+        # allocate array for all velocities of all selected atoms for all frames sampled
+        saved_velocities_atoms_selected = np.zeros((number_of_samples, number_of_tracers, 3))
+
         # allocate array for VACF, length of number_of_correlation_frames
-        # 4 rows are used to save all directions and total VACF
-        VACF_ = np.zeros((4, number_of_correlation_frames))
+        VACF = np.zeros(number_of_correlation_frames)
 
         # allocate array for number of samples per correlation frame
         number_of_samples_correlated = np.zeros(number_of_correlation_frames)
 
         # allocate array for blocks of VACF for statistical error analysis
-        VACF_block = np.zeros((number_of_blocks, 4, number_of_correlation_frames))
+        VACF_block = np.zeros((number_of_blocks, number_of_correlation_frames))
 
         # define how many samples are evaluated per block
         number_of_samples_per_block = math.ceil(number_of_samples / number_of_blocks)
@@ -995,6 +1031,155 @@ class Simulation:
                 f"samples per block ({number_of_samples_per_block}) < correlation frames {number_of_correlation_frames}.",
                 f"Please reduce the number of blocks or run longer trajectories.",
             )
+
+        # Loop over trajectory to sample all positions of selected atoms
+        for count_frames, frames in enumerate(
+            tqdm((tmp_velocity_universe.trajectory[start_frame:end_frame])[::frame_frequency])
+        ):
+
+            # if water diffusion compute center of mass per water molecule
+            # Based on CP2K input this is readily done due to the the H-H-O input structure
+            # If the input file has another format this will lead to errorneous results and
+            # it would be better to just trace the oxygens.
+
+            # compute center of mass of selected atoms, which will be  substracted afterwards
+            center_of_mass_selected_atoms = atoms_selected.center_of_mass()
+
+            if selected_species_string == "O H":
+                # compute center of mass of water molecules
+                center_of_masses_water_molecules = np.asarray(
+                    [
+                        atoms_selected[3 * index_molecule : 3 * index_molecule + 3].center_of_mass()
+                        for index_molecule in np.arange(number_of_tracers)
+                    ]
+                )
+
+                saved_velocities_atoms_selected[count_frames] = (
+                    center_of_masses_water_molecules - center_of_mass_selected_atoms
+                )
+            else:
+                # fill array with positions
+                saved_velocities_atoms_selected[count_frames] = (
+                    atoms_selected.positions - center_of_mass_selected_atoms
+                )
+
+        # Loop over saved positions
+        for frame, velocities_per_frames in enumerate(tqdm(saved_velocities_atoms_selected)):
+
+            # compute last frame sampled, i.e. usually frame+correlation frames
+            last_correlation_frame = frame + number_of_correlation_frames
+            if last_correlation_frame > number_of_samples - 1:
+                last_correlation_frame = number_of_samples
+
+            # define variable to save how many frames where used for correlation
+            number_of_frames_correlated = last_correlation_frame - frame
+
+            # increment which correlation frames were sampled
+            number_of_samples_correlated[0:number_of_frames_correlated] += 1
+
+            # compute autocorrelation function per frame, yet in all directions
+            VACF_per_frame = np.mean(
+                np.sum(
+                    saved_velocities_atoms_selected[frame]
+                    * saved_velocities_atoms_selected[frame:last_correlation_frame],
+                    axis=2,
+                ),
+                axis=1,
+            )
+
+            VACF[0:number_of_frames_correlated] += VACF_per_frame
+            # to get insight on the statistical error we compute block averages
+            VACF_block[index_current_block_used, 0:number_of_frames_correlated] += VACF_per_frame
+
+            # close block when number of samples per block are reached
+            if (
+                frame + 1 >= (index_current_block_used + 1) * number_of_samples_per_block
+                or frame + 1 == number_of_samples
+            ):
+                # initialise with 0
+                number_of_samples_correlated_per_block = 0
+                # check how many samples per frame were taken for this block
+                if index_current_block_used == 0:
+                    # in first block this corresponds to the global number of samples correlated
+                    number_of_samples_correlated_per_block = number_of_samples_correlated
+                else:
+
+                    # in all others we just need to get the difference between current and previous global samples
+                    number_of_samples_correlated_per_block = (
+                        number_of_samples_correlated - previous_global_number_of_samples_correlated
+                    )
+
+                # average current block
+                VACF_block[index_current_block_used, :] = (
+                    VACF_block[index_current_block_used, :] / number_of_samples_correlated_per_block
+                )
+
+                # define previous global number of samples
+                previous_global_number_of_samples_correlated = number_of_samples_correlated.copy()
+
+                # increment index to move to next block
+                index_current_block_used += 1
+
+        # get average autocorrelation
+        average_VACF = VACF / number_of_samples_correlated
+
+        # compute statistical error based on block averags
+        std_VACF = np.std(VACF_block, axis=0)
+
+        # compute diffusion coefficient from obtained VACF by integration
+        # IMPORTANT: the diffusion coefficient will be expressed in m^2/s
+        velocity_unit_conversion = (
+            global_variables.BOHR_TO_ANGSTROM
+            * global_variables.ANGSTROM_TO_METER
+            / global_variables.AU_TIME_TO_SECOND
+            if units_velocity == "a.u."
+            else 1
+        )
+        # Compute prefactor for unit conversion
+        prefactor = velocity_unit_conversion ** 2 * global_variables.FEMTOSECOND_TO_SECOND / 3
+
+        # compute ensemble average of diffusion
+        average_diffusion_coefficient = (
+            scipy.integrate.cumtrapz(
+                average_VACF,
+                dx=frame_frequency * self.time_between_frames,
+                initial=0.0,
+            )
+            * prefactor
+        )
+
+        # compute diffusion coefficient for each block
+        average_diffusion_coefficient_block = (
+            scipy.integrate.cumtrapz(
+                VACF_block,
+                dx=frame_frequency * self.time_between_frames,
+                axis=1,
+                initial=0.0,
+            )
+            * prefactor
+        )
+
+        # based on these blocks compute std
+        std_diffusion_coefficient = np.std(average_diffusion_coefficient_block, axis=0)
+
+        # define time:
+        measured_time = (
+            np.arange(number_of_correlation_frames) * self.time_between_frames * frame_frequency
+        )
+
+        # save all data to dictionary of class
+        string_for_dict = f"{selected_species_string} - ct: {correlation_time}"
+        self.velocity_autocorrelation_function[string_for_dict] = [
+            measured_time,
+            average_VACF,
+            std_VACF,
+        ]
+
+        self.diffusion_coefficients_via_GK[string_for_dict] = [
+            measured_time,
+            average_diffusion_coefficient,
+            std_diffusion_coefficient,
+        ]
 
     def compute_friction_coefficient_via_green_kubo(
         self,

@@ -202,7 +202,7 @@ class TestSimulation_SetUpHydrogenBondingAnalysis:
         assert len(simulation.hydrogen_bonding) == 4
 
 
-class TestAnalysis_ComputeMeanSquaredDisplacement:
+class TestSimulation_ComputeMeanSquaredDisplacement:
     def test_raises_error_when_species_not_found(self):
         path = "./files/bulk_water/classical"
 
@@ -294,7 +294,31 @@ class TestAnalysis_ComputeMeanSquaredDisplacement:
         assert simulation.mean_squared_displacements.get("O H - ct: 200")
 
 
-class TestAnalysis_ComputeFrictionCoefficientViaGreenKubo:
+class TestSimulation_ComputeDiffusionCoefficientViaGreenKubo:
+    def test_returns_diffusion_coefficient(self):
+
+        path = "./files/water_in_carbon_nanotube/classical"
+
+        simulation = analysis.Simulation(path)
+        simulation.read_in_simulation_data(
+            read_positions=True, read_velocities=True, read_summed_forces=False
+        )
+
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+
+        simulation.compute_diffusion_coefficient_via_green_kubo(
+            species=["O"],
+            correlation_time=1000,
+            number_of_blocks=3,
+            start_time=1000,
+            end_time=20000,
+        )
+        assert len(simulation.diffusion_coefficients_via_GK["O - ct: 1000"]) == 3
+
+
+class TestSimulation_ComputeFrictionCoefficientViaGreenKubo:
     def test_raises_error_when_correlation_time_is_too_high(self):
         path = "./files/water_in_carbon_nanotube/quantum"
 
