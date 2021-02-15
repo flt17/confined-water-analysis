@@ -11,6 +11,7 @@ sys.path.append("../")
 from confined_water import hydrogen_bonding
 from confined_water import utils
 from confined_water import global_variables
+from confined_water import free_energy
 
 
 class KeyNotFound(Exception):
@@ -1460,3 +1461,46 @@ class Simulation:
                 * average_radius
                 * self.topology.get_cell_lengths_and_angles()[pbc_dimensions_indices]
             )
+
+    def compute_free_energy_profile(
+        self,
+        start_time: int = None,
+        end_time: int = None,
+        frame_frequency: int = None,
+    ):
+        """
+        Compute the free energy profile of water on top of solid surface.
+        Arguments:
+            start_time (int) : Start time for analysis (optional).
+            end_time (int) : End time for analysis (optional).
+            frame_frequency (int): Take every nth frame only (optional).
+        Returns:
+            surface_area_solid_phase (float): Surface area of the solid phase in A^2.
+        """
+
+        # get information about sampling
+        start_frame, end_frame, frame_frequency = self._get_sampling_frames(
+            start_time, end_time, frame_frequency
+        )
+
+        # determine which position universe are to be used in case of PIMD
+        # Thermodynamic properties are based on trajectory of replica
+        tmp_position_universes = (
+            self.position_universes
+            if len(self.position_universes) == 1
+            else self.position_universes[1::]
+        )
+
+        # get periodic directions:
+        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(self.pbc_dimensions)
+
+        # based on previously set sampling times and selected universes:
+        # compute probability of water molecules and solid atoms
+        probabilities = free_energy.compute_atomic_probabilities(
+            tmp_position_universes,
+            self.topology,
+            pbc_dimensions_indices,
+            start_frame,
+            end_frame,
+            frame_frequency,
+        )
