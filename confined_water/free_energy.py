@@ -1,3 +1,10 @@
+import numpy as np
+from tqdm.notebook import tqdm
+
+sys.path.append("../")
+from confined_water import utils
+
+
 def compute_atomic_probabilities(
     position_universes,
     topology,
@@ -18,6 +25,9 @@ def compute_atomic_probabilities(
 
     """
 
+    # define dimensions not periodic, indices
+    not_pbc_indices = list(set(pbc_indices) ^ set([0, 1, 2]))
+
     # loop over all trajectories (only relevant for PIMD):
     for count_universe, universe in enumerate(position_universes):
 
@@ -36,5 +46,29 @@ def compute_atomic_probabilities(
         for count_frames, frames in enumerate(
             tqdm((universe.trajectory[start_frame:end_frame])[::frame_frequency])
         ):
+            # wrap atoms in box
+            universe.atoms.pack_into_box(box=topology.get_cell_lengths_and_angles(), inplace=True)
 
-            pass
+            # we start by making the frames translationally and rotationally invariant
+            # 1. Translations
+            # This is done by computing the translation and substracting it
+            translation_from_frame0 = solid_atoms.atoms.positions[10] - anchor_coordinates
+            universe.atoms.positions -= translation_from_frame0
+
+            # to enable an easy rotation, translate atoms to COM
+            universe.atoms.positions -= universe.atoms.center_of_mass()
+
+            # 2. Rotations (only relevant for nanotubes obviously)
+            if len(pbc_indices) == 1:
+
+                # Compute angle between reference atom and axis perpendicular to periodic axis
+                angle_anchor_first_axis = np.arccos(
+                    np.clip(
+                        np.dot(universe.atoms.positions[10, not_pbc_indices], np.asarray([1, 0]))
+                        / np.linalg.norm(universe.atoms.positions[10, not_pbc_indices]),
+                        -1.0,
+                        1.0,
+                    )
+                )
+
+                breakpoint()
