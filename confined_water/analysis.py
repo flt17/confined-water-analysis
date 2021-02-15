@@ -1416,6 +1416,7 @@ class Simulation:
 
             # loop over all universes
             radii_sampled = []
+
             for count_universe, universe in enumerate(tmp_position_universes):
 
                 radii_universe = []
@@ -1450,7 +1451,6 @@ class Simulation:
                     radii_universe.append(np.mean(radial_distances_to_axis))
 
                 radii_sampled.append(np.mean(radii_universe))
-
             # average radius of trajectory
             average_radius = np.mean(radii_sampled)
             # return surface area: 2*pi*circumference*length

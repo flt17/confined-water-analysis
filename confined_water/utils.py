@@ -75,7 +75,6 @@ def get_ase_atoms_object(pdb_file_path: str):
     """
 
     try:
-
         # Try to use pdb file to generate atoms object
         return ase.io.read(pdb_file_path)
 

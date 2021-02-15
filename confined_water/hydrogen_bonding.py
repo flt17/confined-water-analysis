@@ -280,15 +280,14 @@ class HydrogenBonding:
             )
 
             # save coordinates of hydrogen bond
-            # so far, only implemented as equal splitting between O and H
-            # could be easily changed to be weighted according to molecular mass
+            # so far, we approxiate the coordinate by oxygen atom
+            # could be easily changed to be weighted according to molecular mass with hydrogen
+            # breakpoint()
             donor_acceptor_pairs_per_frame.hydrogen_bond_coordinates = np.concatenate(
                 [
-                    0.5
-                    * oxygen_atoms[
+                    oxygen_atoms[
                         oxygen_oxygen_pairs_crit1_split[i][tmp_indices_crit123[i][1]]
                     ].positions
-                    + 0.5 * hydrogen_atoms[tmp_indices_crit123[i][0] + i * 2].positions
                     for i in np.arange(number_of_water_molecules)
                 ]
             )[:, :]
