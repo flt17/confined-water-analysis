@@ -1580,17 +1580,25 @@ class Simulation:
             if len(self.position_universes) == 1
             else self.position_universes[1::]
         )
-
         # get periodic directions:
         pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(self.pbc_dimensions)
 
-        # based on previously set sampling times and selected universes:
-        # compute probability of water molecules and solid atoms
-        probabilities = free_energy.compute_atomic_probabilities(
-            tmp_position_universes,
-            self.topology,
-            pbc_dimensions_indices,
-            start_frame,
-            end_frame,
-            frame_frequency,
-        )
+        # compute spatial extent of contact layer
+        spatial_extent_contact_layer = self.get_water_contact_layer_on_interface()
+
+        # loop over all universes
+        for count_universe, universe in enumerate(tmp_position_universes):
+
+            # compute probability of water molecules and solid atoms
+            (
+                distribution_liquid,
+                distribution_solid,
+            ) = free_energy.compute_spatial_distribution_of_atoms_on_interface(
+                universe,
+                self.topology,
+                spatial_extent_contact_layer,
+                pbc_dimensions_indices,
+                start_frame,
+                end_frame,
+                frame_frequency,
+            )
