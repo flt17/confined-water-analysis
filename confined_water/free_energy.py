@@ -149,7 +149,9 @@ def _compute_probabilities_for_system_with_two_periodic_direction(
 
         # start by separating solid atoms from liquid atoms
         solid_atoms = universe.select_atoms("name B N C Na Cl")
-        liquid_atoms = universe.select_atoms("name O H")
+
+        # approximate water with oxygens here
+        liquid_atoms = universe.select_atoms("name O")
 
         # define one "reference atom (ideally in solid phase)"
         # this will serve as our anchor for computing the free energy profile
@@ -162,8 +164,15 @@ def _compute_probabilities_for_system_with_two_periodic_direction(
             # wrap atoms in box
             universe.atoms.pack_into_box(box=topology.get_cell_lengths_and_angles(), inplace=True)
 
-            # we start by making the frames translationally and rotationally invariant
-            # 1. Translations
+            # we start by making the frames translationally invariant
             # This is done by computing the translation and substracting it
             translation_from_frame0 = solid_atoms.atoms.positions[10] - anchor_coordinates
             universe.atoms.positions -= translation_from_frame0
+
+            # define center of mass of solid now
+            solid_COM = solid_atoms.center_of_mass()
+
+            # now compute distance from liquid atoms perpendicular to the center of mass of the solid
+            perpendicular_distance_liquid_to_solid = (
+                liquid_atoms.positions[:, not_pbc_indices] - solid_COM[not_pbc_indices]
+            )
