@@ -317,8 +317,6 @@ class TestSimulation_ComputeDiffusionCoefficientViaGreenKubo:
         )
         assert len(simulation.diffusion_coefficients_via_GK["O - ct: 1000"]) == 3
 
-
-class TestSimulation_ComputeFrictionCoefficientViaGreenKubo:
     def test_raises_error_when_correlation_time_is_too_high(self):
         path = "./files/water_in_carbon_nanotube/quantum"
 
@@ -372,3 +370,58 @@ class TestSimulation_ComputeFrictionCoefficientViaGreenKubo:
         )
 
         assert simulation.friction_coefficients.get("ct: 1000")
+
+
+class TestSimulation_GetWaterContactLayerOnInterface:
+    def test_returns_error_for_three_periodic_directions(self):
+        path = "./files/bulk_water/classical"
+
+        topology_name = "revPBE0-D3-w64-T300K-1bar"
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True, topology_file_name=topology_name)
+
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+
+        with pytest.raises(analysis.UnphysicalValue):
+            simulation.get_water_contact_layer_on_interface()
+
+    def test_returns_contact_layer_for_two_dimensions(self):
+        path = "./files/water_on_graphene"
+
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True)
+
+        simulation.set_pbc_dimensions("xy")
+
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+
+        simulation.compute_density_profile(["O", "H"], direction="z")
+
+        spatial_expansion_contact_layer = simulation.get_water_contact_layer_on_interface()
+
+        assert spatial_expansion_contact_layer > 0
+
+    def test_returns_contact_layer_for_one_dimensions(self):
+        path = "./files/water_in_carbon_nanotube/classical"
+
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True)
+
+        simulation.set_pbc_dimensions("z")
+
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+
+        simulation.compute_density_profile(["O", "H"], direction="radial z")
+
+        spatial_expansion_contact_layer = simulation.get_water_contact_layer_on_interface()
+
+        assert spatial_expansion_contact_layer > 0

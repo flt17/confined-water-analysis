@@ -2,6 +2,7 @@ import math
 import numpy as np
 import pandas
 import scipy
+import scipy.signal
 import sys
 from tqdm.notebook import tqdm
 
@@ -1461,6 +1462,95 @@ class Simulation:
                 * average_radius
                 * self.topology.get_cell_lengths_and_angles()[pbc_dimensions_indices]
             )
+
+    def get_water_contact_layer_on_interface(self):
+        """
+        Compute spatial extension of water contact layer on solid interface.
+        Important: This function requires a previous evaluation of the density profile.
+        Arguments:
+        Returns:
+            spatial expansion of the contact layer in angstroms
+        """
+
+        # based on pbc check what direction is investigated
+        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(self.pbc_dimensions)
+
+        not_pbc_dimensions = list(set(self.pbc_dimensions) ^ set("xyz"))
+        not_pbc_indices = list(set(pbc_dimensions_indices) ^ set([0, 1, 2]))
+
+        # if bulk, raise error
+        if len(pbc_dimensions_indices) == 3:
+            raise UnphysicalValue(
+                f" You want to compute a contact layer of water for bulk water."
+                f" If there is no solid, there won't be a contact layer.",
+                f" If you have a solid in your system, please change the pbc dimensions accordingly.",
+            )
+
+        # if 2 dimensions
+        elif len(pbc_dimensions_indices) == 2:
+            string_density_dict = f"O H - {not_pbc_dimensions[0]}"
+
+            # if density profile is not computed raise error
+            if not self.density_profiles.get(string_density_dict):
+                raise KeyNotFound(
+                    f"Couldn't find a density profile with the name {string_density_dict}."
+                    f"Make sure you compute the profile first for oxygens and hydrogens."
+                )
+
+            # let's start by smoothing the density profile
+            smooth_density_profile = scipy.signal.savgol_filter(
+                self.density_profiles[string_density_dict][1], 11, 5
+            )
+
+            # based on smooth profile, find peaks
+            # we multiply the profile by -1 to find minima instead of peaks
+            # Use negative to get minima as 'peaks'
+            peak_indices, __ = scipy.signal.find_peaks(
+                -smooth_density_profile,
+                distance=2
+                / (
+                    self.density_profiles[string_density_dict][0][1]
+                    - self.density_profiles[string_density_dict][0][0]
+                ),
+            )
+
+            # we return now only the second minimum find expressed in the bins of the profile, i.e. in angstroms
+            # the second minima is chosen instead of the first, as this is not zero and represents the "end" of
+            # the contact layer.
+            return self.density_profiles[string_density_dict][0][peak_indices[1]]
+
+        # if 1 dimension
+        elif len(pbc_dimensions_indices) == 1:
+            string_density_dict = f"O H - radial {self.pbc_dimensions}"
+
+            # if density profile is not computed raise error
+            if not self.density_profiles.get(string_density_dict):
+                raise KeyNotFound(
+                    f"Couldn't find a density profile with the name {string_density_dict}."
+                    f"Make sure you compute the profile first for oxygens and hydrogens."
+                )
+            # let's start by smoothing the density profile
+            smooth_density_profile = scipy.signal.savgol_filter(
+                self.density_profiles[string_density_dict][1], 11, 5
+            )
+
+            # based on smooth profile, find peaks
+            # we multiply the profile by -1 to find minima instead of peaks
+            # Use negative to get minima as 'peaks'
+            peak_indices, __ = scipy.signal.find_peaks(
+                -smooth_density_profile,
+                distance=2
+                / (
+                    self.density_profiles[string_density_dict][0][1]
+                    - self.density_profiles[string_density_dict][0][0]
+                ),
+            )
+
+            # we return now only the second minimum find expressed in the bins of the profile, i.e. in angstroms
+            # the second minima is chosen instead of the first, as this is not zero and represents the "end" of
+            # the contact layer. However, here we have to take the second last element, as the solid is located
+            # at larger distances.
+            return self.density_profiles[string_density_dict][0][peak_indices[-2]]
 
     def compute_free_energy_profile(
         self,
