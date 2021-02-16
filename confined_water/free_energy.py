@@ -91,6 +91,14 @@ def _compute_distribution_for_system_with_one_periodic_direction(
     # this will serve as our anchor for computing the free energy profile
     anchor_coordinates = solid_atoms[10].position
 
+    # define arrays where the coordinates of oxygens and solid atoms will be saved in
+    liquid_contact_coord1 = []
+    liquid_contact_coord2 = []
+    solid_coord1 = []
+    solid_coord2 = []
+
+    # solid_1 = np.zeros((int((end_frame - start_frame) / frame_frequency), len(solid_atoms), 2))
+
     # Loop over trajectory
     for count_frames, frames in enumerate(
         tqdm((universe.trajectory[start_frame:end_frame])[::frame_frequency])
@@ -132,6 +140,69 @@ def _compute_distribution_for_system_with_one_periodic_direction(
 
         # wrap atoms in box
         universe.atoms.pack_into_box(box=topology.get_cell_lengths_and_angles(), inplace=True)
+
+        # define center of mass of solid now
+        solid_COM = solid_atoms.center_of_mass()
+
+        # define tube radius and circumference
+        tube_radius = np.mean(
+            np.linalg.norm(
+                solid_atoms.positions[:, not_pbc_indices] - solid_COM[not_pbc_indices], axis=1
+            )
+        )
+        tube_circumference = 2 * np.pi * tube_radius
+
+        # now compute vector from liquid atoms from the center axis of the solid
+        vector_liquid_to_central_axis = liquid_atoms.positions - solid_COM
+
+        # only choose those atoms which are within contact layer from solid
+        liquid_atoms_in_contact_positions = vector_liquid_to_central_axis[
+            np.where(
+                np.linalg.norm(vector_liquid_to_central_axis[:, not_pbc_indices], axis=1)
+                >= spatial_extent_contact_layer
+            )
+        ]
+
+        # for chosen atoms compute position in periodic and angular direction
+        # periodic is easy
+        liquid_contact_coord1 = np.append(
+            liquid_contact_coord1,
+            liquid_atoms_in_contact_positions[:, pbc_indices] + solid_COM[pbc_indices],
+        )
+
+        # the angular coordinate is a bit more tricky
+        # start by computing angle from axis
+        angles_liquid_contact_central_axis = np.arctan2(
+            liquid_atoms_in_contact_positions[:, not_pbc_indices[1]],
+            liquid_atoms_in_contact_positions[:, not_pbc_indices[0]],
+        )
+
+        # compute expansion on opened tube (adding pi to get only positive values)
+        angular_component_liquid_contact = (
+            tube_circumference * (angles_liquid_contact_central_axis + np.pi) / (2 * np.pi)
+        )
+        liquid_contact_coord2 = np.append(liquid_contact_coord2, angular_component_liquid_contact)
+
+        # do the same thing for solid
+        vector_solid_to_central_axis = solid_atoms.positions - solid_COM
+        solid_coord1 = np.append(solid_coord1, solid_atoms.positions[:, pbc_indices])
+
+        angles_solid_central_axis = np.arctan2(
+            vector_solid_to_central_axis[:, not_pbc_indices[1]],
+            vector_solid_to_central_axis[:, not_pbc_indices[0]],
+        )
+
+        angular_component_solid = (
+            tube_circumference * (angles_solid_central_axis + np.pi) / (2 * np.pi)
+        )
+
+        solid_coord2 = np.append(solid_coord2, angular_component_solid)
+
+    # stack everything
+    liquid_contact_2d = np.column_stack((liquid_contact_coord1, liquid_contact_coord2))
+    solid_2d = np.column_stack((solid_coord1, solid_coord2))
+
+    return liquid_contact_2d, solid_2d
 
 
 def _compute_distribution_for_system_with_two_periodic_directions(
@@ -222,7 +293,7 @@ def _compute_distribution_for_system_with_two_periodic_directions(
         )
 
         # save solid
-        solid_all[count_frames] = solid_atoms.positions[:, pbc_indices]
+        solid_all[count_frames] = np.concatenate(solid_atoms.positions[:, pbc_indices])
 
     # put coords of liquid together
     liquid_contact_2d = np.column_stack((liquid_contact_coord1, liquid_contact_coord2))

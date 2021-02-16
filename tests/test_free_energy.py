@@ -7,23 +7,31 @@ from confined_water import free_energy
 
 
 class TestComputeAtomicProbabilities:
-    # def test_returns_probabilities_for_tube(self):
-    #     path = "./files/water_in_carbon_nanotube/classical"
+    def test_returns_probabilities_for_tube(self):
+        path = "./files/water_in_carbon_nanotube/classical"
 
-    #     simulation = analysis.Simulation(path)
-    #     simulation.read_in_simulation_data(read_positions=True, read_summed_forces=True)
+        simulation = analysis.Simulation(path)
+        simulation.read_in_simulation_data(read_positions=True)
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
 
-    #     simulation.set_pbc_dimensions(pbc_dimensions="z")
-    #     pbc_indices = global_variables.DIMENSION_DICTIONARY.get(simulation.pbc_dimensions)
+        simulation.set_pbc_dimensions(pbc_dimensions="z")
+        pbc_indices = global_variables.DIMENSION_DICTIONARY.get(simulation.pbc_dimensions)
 
-    #     free_energy.compute_atomic_probabilities(
-    #         simulation.position_universes,
-    #         simulation.topology,
-    #         pbc_indices,
-    #         start_frame=0,
-    #         end_frame=100,
-    #         frame_frequency=1,
-    #     )
+        simulation.compute_density_profile(["O", "H"], direction="radial z")
+
+        spatial_expansion_contact_layer = simulation.get_water_contact_layer_on_interface()
+
+        free_energy.compute_spatial_distribution_of_atoms_on_interface(
+            simulation.position_universes[0],
+            simulation.topology,
+            spatial_expansion_contact_layer,
+            pbc_indices,
+            start_frame=0,
+            end_frame=100,
+            frame_frequency=1,
+        )
 
     def test_returns_probabilities_for_sheet(self):
         path = "./files/water_on_graphene"
@@ -42,8 +50,8 @@ class TestComputeAtomicProbabilities:
 
         spatial_expansion_contact_layer = simulation.get_water_contact_layer_on_interface()
 
-        free_energy.compute_atomic_probabilities(
-            simulation.position_universes,
+        free_energy.compute_spatial_distribution_of_atoms_on_interface(
+            simulation.position_universes[0],
             simulation.topology,
             spatial_expansion_contact_layer,
             pbc_indices,
