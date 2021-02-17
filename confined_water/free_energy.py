@@ -293,9 +293,9 @@ def _compute_distribution_for_system_with_two_periodic_directions(
         )
 
         # save solid
-        solid_all[count_frames] = np.concatenate(solid_atoms.positions[:, pbc_indices])
+        solid_all[count_frames] = solid_atoms.positions[:, pbc_indices]
 
     # put coords of liquid together
     liquid_contact_2d = np.column_stack((liquid_contact_coord1, liquid_contact_coord2))
 
-    return liquid_contact_2d, solid_all
+    return liquid_contact_2d, np.concatenate(solid_all)
