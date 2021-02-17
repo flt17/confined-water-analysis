@@ -70,6 +70,9 @@ class HydrogenBonding:
 
         hydrogen_bonding_data = []
 
+        # determine minimum index, i.e. is water saved as HHO or OHH
+        min_index = np.min([np.min(oxygen_atoms.indices), np.min(hydrogen_atoms.indices)])
+
         # Loop over trajectory
         for count_frames, frames in enumerate(
             tqdm((self.position_universe.trajectory[start_frame:end_frame])[::frame_frequency])
@@ -235,11 +238,14 @@ class HydrogenBonding:
 
             # id of donor water molecule
             donor_acceptor_pairs_per_frame.water_donor_ids = np.asarray(
-                np.concatenate(
-                    [
-                        hydrogen_atoms.indices[tmp_indices_crit123[i][0] + i * 2].flatten()
-                        for i in np.arange(number_of_water_molecules)
-                    ]
+                (
+                    np.concatenate(
+                        [
+                            hydrogen_atoms.indices[tmp_indices_crit123[i][0] + i * 2].flatten()
+                            for i in np.arange(number_of_water_molecules)
+                        ]
+                    )
+                    - min_index
                 )
                 / 3
                 + 1
@@ -247,17 +253,20 @@ class HydrogenBonding:
 
             # id of acceptor water molecule
             donor_acceptor_pairs_per_frame.water_acceptor_ids = np.asarray(
-                np.asarray(
-                    oxygen_atoms.indices[
-                        np.concatenate(
-                            [
-                                oxygen_oxygen_pairs_crit1_split[i][
-                                    tmp_indices_crit123[i][1]
-                                ].flatten()
-                                for i in np.arange(number_of_water_molecules)
-                            ]
-                        )
-                    ]
+                (
+                    np.asarray(
+                        oxygen_atoms.indices[
+                            np.concatenate(
+                                [
+                                    oxygen_oxygen_pairs_crit1_split[i][
+                                        tmp_indices_crit123[i][1]
+                                    ].flatten()
+                                    for i in np.arange(number_of_water_molecules)
+                                ]
+                            )
+                        ]
+                    )
+                    - min_index
                 )
                 / 3
                 + 1
