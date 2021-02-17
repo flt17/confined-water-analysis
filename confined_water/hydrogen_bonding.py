@@ -233,6 +233,36 @@ class HydrogenBonding:
                 )
             ]
 
+            # id of donor water molecule
+            donor_acceptor_pairs_per_frame.water_donor_ids = np.asarray(
+                np.concatenate(
+                    [
+                        hydrogen_atoms.indices[tmp_indices_crit123[i][0] + i * 2].flatten()
+                        for i in np.arange(number_of_water_molecules)
+                    ]
+                )
+                / 3
+                + 1
+            ).astype(int)
+
+            # id of acceptor water molecule
+            donor_acceptor_pairs_per_frame.water_acceptor_ids = np.asarray(
+                np.asarray(
+                    oxygen_atoms.indices[
+                        np.concatenate(
+                            [
+                                oxygen_oxygen_pairs_crit1_split[i][
+                                    tmp_indices_crit123[i][1]
+                                ].flatten()
+                                for i in np.arange(number_of_water_molecules)
+                            ]
+                        )
+                    ]
+                )
+                / 3
+                + 1
+            )
+
             # distance between oxygens
             donor_acceptor_pairs_per_frame.oxygen_oxygen_distances = np.concatenate(
                 [
@@ -304,6 +334,8 @@ class HydrogenBonding:
                 "Time",
                 "Donor ID",
                 "Acceptor ID",
+                "Donor molecule",
+                "Acceptor molecule",
                 "Distance between oxygens",
                 "Delta distance",
                 "angle OOH",
@@ -316,6 +348,13 @@ class HydrogenBonding:
         hydrogen_bonding_dataframe["Donor ID"] = hydrogen_bonding_dataframe["Donor ID"].astype(int)
         hydrogen_bonding_dataframe["Acceptor ID"] = hydrogen_bonding_dataframe[
             "Acceptor ID"
+        ].astype(int)
+
+        hydrogen_bonding_dataframe["Donor molecule"] = hydrogen_bonding_dataframe[
+            "Donor molecule"
+        ].astype(int)
+        hydrogen_bonding_dataframe["Acceptor molecule"] = hydrogen_bonding_dataframe[
+            "Acceptor molecule"
         ].astype(int)
 
         self.dataframe = hydrogen_bonding_dataframe
@@ -357,6 +396,8 @@ class DonorAcceptorPairs:
                 np.repeat(self.time, len(self.hydrogen_donor_ids)),
                 self.hydrogen_donor_ids,
                 self.oxygen_acceptor_ids,
+                self.water_donor_ids,
+                self.water_acceptor_ids,
                 self.oxygen_oxygen_distances,
                 self.delta_distances,
                 self.angles_OOH,

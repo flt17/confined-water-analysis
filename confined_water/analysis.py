@@ -1602,3 +1602,4 @@ class Simulation:
                 end_frame,
                 frame_frequency,
             )
+        return distribution_liquid, distribution_solid
