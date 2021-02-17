@@ -318,11 +318,8 @@ class HydrogenBonding:
                 distances_oxyen_covalent_hydrogens - distances_acceptor_oxygen_H
             )
 
-            # save coordinates of hydrogen bond
-            # so far, we approxiate the coordinate by oxygen atom
-            # could be easily changed to be weighted according to molecular mass with hydrogen
-            # breakpoint()
-            donor_acceptor_pairs_per_frame.hydrogen_bond_coordinates = np.concatenate(
+            # save coordinates of hydrogen bond, first acceptor
+            donor_acceptor_pairs_per_frame.acceptor_coordinates = np.concatenate(
                 [
                     oxygen_atoms[
                         oxygen_oxygen_pairs_crit1_split[i][tmp_indices_crit123[i][1]]
@@ -330,6 +327,14 @@ class HydrogenBonding:
                     for i in np.arange(number_of_water_molecules)
                 ]
             )[:, :]
+
+            # then donor
+            donor_acceptor_pairs_per_frame.donor_coordinates = np.asarray(
+                [
+                    oxygen_atoms[int(water_mol - 1)].position
+                    for water_mol in donor_acceptor_pairs_per_frame.water_donor_ids
+                ]
+            )
 
             # Eventually, append computed array with all this information for one frame
             hydrogen_bonding_data.extend(
@@ -341,29 +346,34 @@ class HydrogenBonding:
             hydrogen_bonding_data,
             columns=[
                 "Time",
-                "Donor ID",
-                "Acceptor ID",
-                "Donor molecule",
-                "Acceptor molecule",
+                "Donor atom ID",
+                "Acceptor atom ID",
+                "Donor molecule ID",
+                "Acceptor molecule ID",
                 "Distance between oxygens",
                 "Delta distance",
                 "angle OOH",
-                "Hydrogen bond x",
-                "Hydrogen bond y",
-                "Hydrogen bond z",
+                "Donor molecule x",
+                "Donor molecule y",
+                "Donor molecule z",
+                "Acceptor molecule x",
+                "Acceptor molecule y",
+                "Acceptor molecule z",
             ],
         )
 
-        hydrogen_bonding_dataframe["Donor ID"] = hydrogen_bonding_dataframe["Donor ID"].astype(int)
-        hydrogen_bonding_dataframe["Acceptor ID"] = hydrogen_bonding_dataframe[
-            "Acceptor ID"
+        hydrogen_bonding_dataframe["Donor atom ID"] = hydrogen_bonding_dataframe[
+            "Donor atom ID"
+        ].astype(int)
+        hydrogen_bonding_dataframe["Acceptor atom ID"] = hydrogen_bonding_dataframe[
+            "Acceptor atom ID"
         ].astype(int)
 
-        hydrogen_bonding_dataframe["Donor molecule"] = hydrogen_bonding_dataframe[
-            "Donor molecule"
+        hydrogen_bonding_dataframe["Donor molecule ID"] = hydrogen_bonding_dataframe[
+            "Donor molecule ID"
         ].astype(int)
-        hydrogen_bonding_dataframe["Acceptor molecule"] = hydrogen_bonding_dataframe[
-            "Acceptor molecule"
+        hydrogen_bonding_dataframe["Acceptor molecule ID"] = hydrogen_bonding_dataframe[
+            "Acceptor molecule ID"
         ].astype(int)
 
         self.dataframe = hydrogen_bonding_dataframe
@@ -410,9 +420,12 @@ class DonorAcceptorPairs:
                 self.oxygen_oxygen_distances,
                 self.delta_distances,
                 self.angles_OOH,
-                self.hydrogen_bond_coordinates[:, 0],
-                self.hydrogen_bond_coordinates[:, 1],
-                self.hydrogen_bond_coordinates[:, 2],
+                self.donor_coordinates[:, 0],
+                self.donor_coordinates[:, 1],
+                self.donor_coordinates[:, 2],
+                self.acceptor_coordinates[:, 0],
+                self.acceptor_coordinates[:, 1],
+                self.acceptor_coordinates[:, 2],
             ]
         ).T
 
