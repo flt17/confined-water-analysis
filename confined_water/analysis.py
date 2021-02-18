@@ -1638,4 +1638,16 @@ class Simulation:
                 tube_radius,
                 tube_length_in_unit_cells,
             )
+
+        (
+            liquid_free_energy_profile_data,
+            solid_free_energy_profile_data,
+        ) = free_energy.prepare_for_plotting(
+            distribution_liquid,
+            distribution_solid,
+            self.topology,
+            tube_radius,
+            tube_length_in_unit_cells,
+        )
+
         return distribution_liquid, distribution_solid

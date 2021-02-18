@@ -30,10 +30,16 @@ def compute_spatial_distribution_of_atoms_on_interface(
 
     """
 
+    # get all atom types which are not water:
+    solid_types = list(set(np.unique(position_universe.atoms.types)) ^ set(["O", "H"]))
+
+    # define how many samples will be taken
+    number_of_samples = int((end_frame - start_frame) / frame_frequency)
+
     if len(pbc_indices) == 1:
 
         # compute probabilities for tube
-        return _compute_distribution_for_system_with_one_periodic_direction(
+        liquid, solid = _compute_distribution_for_system_with_one_periodic_direction(
             position_universe,
             topology,
             spatial_extent_contact_layer,
@@ -47,7 +53,7 @@ def compute_spatial_distribution_of_atoms_on_interface(
 
     else:
         # compute probabilities for flat interface
-        return _compute_distribution_for_system_with_two_periodic_directions(
+        liquid, solid = _compute_distribution_for_system_with_two_periodic_directions(
             position_universe,
             topology,
             spatial_extent_contact_layer,
@@ -56,6 +62,28 @@ def compute_spatial_distribution_of_atoms_on_interface(
             end_frame,
             frame_frequency,
         )
+
+    # before returning distribution assign solid positions to types
+    # start by reshaping solid
+    solid_reshaped = solid.reshape(number_of_samples, -1, 2)
+
+    # re-define solid atoms once more (could be done better)
+    solid_atoms = position_universe.select_atoms("name B N C Na Cl")
+
+    # define dictionary
+    dict_solid_per_element = {}
+
+    # now loop over all atom types
+    for element in solid_types:
+        # get indices
+        indices_for_element = np.where(solid_atoms.types == element)
+
+        # positions of element
+        positions_for_element = solid_reshaped[:, indices_for_element].reshape(-1, 2)
+
+        dict_solid_per_element[element] = positions_for_element
+
+    return liquid, dict_solid_per_element
 
 
 def _compute_distribution_for_system_with_one_periodic_direction(
@@ -341,3 +369,13 @@ def _get_atom_ids_on_same_tube_axis(solid_atoms, tube_length_in_unit_cells: int,
 
     # return indices closest based on tube length
     return ids_candidate_atoms_on_axis_with_0[0 : 2 * tube_length_in_unit_cells]
+
+
+def prepare_for_plotting(
+    distribution_liquid,
+    distribution_solid,
+    topology,
+    tube_radius: float,
+    tube_length_in_unit_cells: int,
+):
+    pass
