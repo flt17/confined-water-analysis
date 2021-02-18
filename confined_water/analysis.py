@@ -1401,67 +1401,91 @@ class Simulation:
             return np.prod(self.topology.get_cell_lengths_and_angles()[pbc_dimensions_indices])
 
         else:
-            # in case we have a tube start sampling radius, i.e. distance from atom from center of mass
+            # in case we have a tube start we need to compute the radius first
 
-            # get information about sampling
-            start_frame, end_frame, frame_frequency = self._get_sampling_frames(
-                start_time, end_time, frame_frequency
+            tube_radius = self.compute_tube_radius(
+                pbc_dimensions_indices, start_time, end_time, frame_frequency
             )
-
-            # determine which position universe are to be used in case of PIMD
-            # Thermodynamic properties are based on trajectory of replica
-            tmp_position_universes = (
-                self.position_universes
-                if len(self.position_universes) == 1
-                else self.position_universes[1::]
-            )
-
-            # loop over all universes
-            radii_sampled = []
-
-            for count_universe, universe in enumerate(tmp_position_universes):
-
-                radii_universe = []
-                # determine solid atoms, so far only B N C supported
-                solid_atoms = universe.select_atoms(f"name B N C")
-
-                # Loop over trajectory, as the radius should converge quickly we take only every 10th frame in comparison
-                # to the global settings
-                for count_frames, frames in enumerate(
-                    tqdm((universe.trajectory[start_frame:end_frame])[:: int(10 * frame_frequency)])
-                ):
-
-                    # determine center of mass:
-                    system_center_of_mass = np.ma.array(universe.atoms.center_of_mass())
-
-                    # use only in 2D (the directions confined)
-                    system_center_of_mass[pbc_dimensions_indices] = np.ma.masked
-                    reference_coordinates = system_center_of_mass.compressed()
-
-                    # get solid atoms coordinates in 2D
-                    solid_atoms_positions = np.ma.array(solid_atoms.positions)
-                    solid_atoms_positions[:, pbc_dimensions_indices] = np.ma.masked
-                    solid_atoms_positions_confined_directions = (
-                        solid_atoms_positions.compressed().reshape(-1, 2)
-                    )
-
-                    # compute radial distance of solid atoms in non-periodic directions from center of mass
-                    radial_distances_to_axis = np.linalg.norm(
-                        solid_atoms_positions_confined_directions - reference_coordinates, axis=1
-                    )
-
-                    radii_universe.append(np.mean(radial_distances_to_axis))
-
-                radii_sampled.append(np.mean(radii_universe))
-            # average radius of trajectory
-            average_radius = np.mean(radii_sampled)
             # return surface area: 2*pi*circumference*length
             return (
                 2
                 * np.pi
-                * average_radius
+                * tube_radius
                 * self.topology.get_cell_lengths_and_angles()[pbc_dimensions_indices]
             )
+
+    def compute_tube_radius(
+        self,
+        pbc_dimensions_indices: list,
+        start_time: int = None,
+        end_time: int = None,
+        frame_frequency: int = None,
+    ):
+        """
+        Compute radius of tube from position universe
+        Arguments:
+            pbc_dimensions_indices (list): List of indices of axes being periodic in the system.
+            start_time (int) : Start time for analysis (optional).
+            end_time (int) : End time for analysis (optional).
+            frame_frequency (int): Take every nth frame only (optional).
+        Returns:
+            tube_radius (float): tube radius in A.
+        """
+
+        # get information about sampling
+        start_frame, end_frame, frame_frequency = self._get_sampling_frames(
+            start_time, end_time, frame_frequency
+        )
+
+        # determine which position universe are to be used in case of PIMD
+        # Thermodynamic properties are based on trajectory of replica
+        tmp_position_universes = (
+            self.position_universes
+            if len(self.position_universes) == 1
+            else self.position_universes[1::]
+        )
+
+        # loop over all universes
+        radii_sampled = []
+
+        for count_universe, universe in enumerate(tmp_position_universes):
+
+            radii_universe = []
+            # determine solid atoms, so far only B N C supported
+            solid_atoms = universe.select_atoms(f"name B N C")
+
+            # Loop over trajectory, as the radius should converge quickly we take only every 10th frame in comparison
+            # to the global settings
+            for count_frames, frames in enumerate(
+                tqdm((universe.trajectory[start_frame:end_frame])[:: int(10 * frame_frequency)])
+            ):
+
+                # determine center of mass:
+                system_center_of_mass = np.ma.array(universe.atoms.center_of_mass())
+
+                # use only in 2D (the directions confined)
+                system_center_of_mass[pbc_dimensions_indices] = np.ma.masked
+                reference_coordinates = system_center_of_mass.compressed()
+
+                # get solid atoms coordinates in 2D
+                solid_atoms_positions = np.ma.array(solid_atoms.positions)
+                solid_atoms_positions[:, pbc_dimensions_indices] = np.ma.masked
+                solid_atoms_positions_confined_directions = (
+                    solid_atoms_positions.compressed().reshape(-1, 2)
+                )
+
+                # compute radial distance of solid atoms in non-periodic directions from center of mass
+                radial_distances_to_axis = np.linalg.norm(
+                    solid_atoms_positions_confined_directions - reference_coordinates, axis=1
+                )
+
+                radii_universe.append(np.mean(radial_distances_to_axis))
+
+            radii_sampled.append(np.mean(radii_universe))
+        # average radius of trajectory
+        tube_radius = np.mean(radii_sampled)
+
+        return tube_radius
 
     def get_water_contact_layer_on_interface(self):
         """
