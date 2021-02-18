@@ -1457,7 +1457,7 @@ class Simulation:
             # Loop over trajectory, as the radius should converge quickly we take only every 10th frame in comparison
             # to the global settings
             for count_frames, frames in enumerate(
-                tqdm((universe.trajectory[start_frame:end_frame])[:: int(10 * frame_frequency)])
+                tqdm((universe.trajectory[start_frame:end_frame])[:: int(frame_frequency)])
             ):
 
                 # determine center of mass:
@@ -1578,6 +1578,7 @@ class Simulation:
 
     def compute_free_energy_profile(
         self,
+        tube_length_in_unit_cells: int = None,
         start_time: int = None,
         end_time: int = None,
         frame_frequency: int = None,
@@ -1615,6 +1616,7 @@ class Simulation:
             tube_radius = self.compute_tube_radius(
                 pbc_dimensions_indices, start_time, end_time, frame_frequency
             )
+
         else:
             tube_radius = None
 
@@ -1634,5 +1636,6 @@ class Simulation:
                 end_frame,
                 frame_frequency,
                 tube_radius,
+                tube_length_in_unit_cells,
             )
         return distribution_liquid, distribution_solid

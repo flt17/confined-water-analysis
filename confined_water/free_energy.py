@@ -15,6 +15,7 @@ def compute_spatial_distribution_of_atoms_on_interface(
     end_frame: int,
     frame_frequency: int,
     tube_radius: float = None,
+    tube_length_in_unit_cells: int = None,
 ):
     """
     Compute distribution of atomic positions on interface.
@@ -37,6 +38,7 @@ def compute_spatial_distribution_of_atoms_on_interface(
             topology,
             spatial_extent_contact_layer,
             tube_radius,
+            tube_length_in_unit_cells,
             pbc_indices,
             start_frame,
             end_frame,
@@ -61,6 +63,7 @@ def _compute_distribution_for_system_with_one_periodic_direction(
     topology,
     spatial_extent_contact_layer: float,
     tube_radius: float,
+    tube_length_in_unit_cells: int,
     pbc_indices,
     start_frame: int,
     end_frame: int,
@@ -73,6 +76,7 @@ def _compute_distribution_for_system_with_one_periodic_direction(
         topology : ASE atoms object containing information about topology.
         spatial_extent_contact_layer (float): How far ranges the water contact layer.
         tube_radius (float) : radius of the tube in A.
+        tube_length_in_unit_cells (int): multiples of tube unit cell in periodic direction.
         pbc_indices : Direction indices in which system is periodic
         start_frame (int) : Start frame for analysis.
         end_frame (int) : End frame for analysis.
@@ -85,15 +89,19 @@ def _compute_distribution_for_system_with_one_periodic_direction(
     periodic_vector[pbc_indices] = 1
 
     # wrap atoms in box
-    universe.atoms.pack_into_box(box=topology.get_cell_lengths_and_angles(), inplace=True)
+    # universe.atoms.pack_into_box(box=topology.get_cell_lengths_and_angles(), inplace=True)
 
     # start by separating solid atoms from liquid atoms
     solid_atoms = universe.select_atoms("name B N C Na Cl")
     liquid_atoms = universe.select_atoms("name O H")
 
-    # define one "reference atom (ideally in solid phase)"
-    # this will serve as our anchor for computing the free energy profile
-    anchor_coordinates = solid_atoms[10].position
+    # this will serve as our anchor for translation for computing the free energy profile
+    anchor_coordinates = solid_atoms.center_of_mass()
+
+    # define reference atoms which will be used to determine rotation
+    indices_atoms_anchor_rotation = _get_atom_ids_on_same_tube_axis(
+        solid_atoms, tube_length_in_unit_cells, not_pbc_indices
+    )
 
     # compute circumference based on diameter
     tube_circumference = 2 * np.pi * tube_radius
@@ -110,14 +118,13 @@ def _compute_distribution_for_system_with_one_periodic_direction(
     for count_frames, frames in enumerate(
         tqdm((universe.trajectory[start_frame:end_frame])[::frame_frequency])
     ):
-        # wrap atoms in box
-        universe.atoms.pack_into_box(box=topology.get_cell_lengths_and_angles(), inplace=True)
 
         # we start by making the frames translationally and rotationally invariant
         # 1. Translations
         # This is done by computing the translation and substracting it
 
-        translation_from_frame0 = solid_atoms.atoms.positions[10] - anchor_coordinates
+        # solid
+        translation_from_frame0 = solid_atoms.center_of_mass() - anchor_coordinates
         universe.atoms.positions -= translation_from_frame0
 
         # 2. Rotations (only relevant for nanotubes obviously)
@@ -126,18 +133,31 @@ def _compute_distribution_for_system_with_one_periodic_direction(
         COM = universe.atoms.center_of_mass()
         universe.atoms.positions -= COM
 
-        # Compute angle between reference atom and axis perpendicular to periodic axis
-        angle_anchor_first_axis = np.arccos(
-            np.clip(
-                np.dot(universe.atoms.positions[10, not_pbc_indices], np.asarray([1, 0]))
-                / np.linalg.norm(universe.atoms.positions[10, not_pbc_indices]),
-                -1.0,
-                1.0,
+        # prepare everything to compute angle between axis and anchor axis
+        solid_axis = np.mean(
+            solid_atoms.positions[indices_atoms_anchor_rotation][:, not_pbc_indices],
+            axis=0,
+        )
+
+        # define normed dot product
+        normed_dot_product = np.clip(
+            np.dot(
+                solid_axis,
+                np.asarray([1, 0]),
             )
+            / np.linalg.norm(solid_axis),
+            -1.0,
+            1.0,
+        )
+
+        # Compute angle between reference atom and axis perpendicular to periodic axis
+        # note we need the negative angle if above 180 degrees
+        angle_anchor_first_axis = (
+            np.arccos(normed_dot_product) if solid_axis[1] <= 0 else -np.arccos(normed_dot_product)
         )
 
         # get rotation matrix for periodic axis and computed angle
-        rotation_matrix = utils.rotation_matrix(periodic_vector, -angle_anchor_first_axis)
+        rotation_matrix = utils.rotation_matrix(periodic_vector, +angle_anchor_first_axis)
 
         # rotate atoms, so that this can be compared
         universe.atoms.positions = np.matmul(rotation_matrix, universe.atoms.positions.T).T
@@ -245,9 +265,8 @@ def _compute_distribution_for_system_with_two_periodic_directions(
     # approximate water with oxygens here
     liquid_atoms = universe.select_atoms("name O")
 
-    # define one "reference atom (ideally in solid phase)"
     # this will serve as our anchor for computing the free energy profile
-    anchor_coordinates = solid_atoms[10].position
+    anchor_coordinates = universe.atoms.center_of_mass()
 
     # define arrays where the coordinates of oxygens and solid atoms will be saved in
     liquid_contact_coord1 = []
@@ -263,7 +282,7 @@ def _compute_distribution_for_system_with_two_periodic_directions(
 
         # we start by making the frames translationally invariant
         # This is done by computing the translation and substracting it
-        translation_from_frame0 = solid_atoms.atoms.positions[10] - anchor_coordinates
+        translation_from_frame0 = universe.atoms.center_of_mass() - anchor_coordinates
         universe.atoms.positions -= translation_from_frame0
 
         # wrap atoms in box
@@ -298,3 +317,27 @@ def _compute_distribution_for_system_with_two_periodic_directions(
     liquid_contact_2d = np.column_stack((liquid_contact_coord1, liquid_contact_coord2))
 
     return liquid_contact_2d, np.concatenate(solid_all)
+
+
+def _get_atom_ids_on_same_tube_axis(solid_atoms, tube_length_in_unit_cells: int, not_pbc_indices):
+    """
+    Compute axis through atoms of tube parallel to tube axis..
+    Arguments:
+        solid_atoms: All atoms (including positions) of the tube.
+        tube_length_in_unit_cells (int): Length of the tube expressed in multiples of unit cell
+        not_pbc_indices: List of ints which are not periodic.
+    Returns:
+        ids_atoms_on_axis = list of atom ids on the same axis
+
+    """
+
+    # for atom 0 get all indices of atoms which have similar coordinates in the non-pbc directions
+    ids_candidate_atoms_on_axis_with_0 = np.argsort(
+        np.linalg.norm(
+            solid_atoms.positions[:, not_pbc_indices] - solid_atoms.positions[0][not_pbc_indices],
+            axis=1,
+        )
+    )
+
+    # return indices closest based on tube length
+    return ids_candidate_atoms_on_axis_with_0[0 : 2 * tube_length_in_unit_cells]
