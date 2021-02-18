@@ -14,6 +14,7 @@ def compute_spatial_distribution_of_atoms_on_interface(
     start_frame: int,
     end_frame: int,
     frame_frequency: int,
+    tube_radius: float = None,
 ):
     """
     Compute distribution of atomic positions on interface.
@@ -35,6 +36,7 @@ def compute_spatial_distribution_of_atoms_on_interface(
             position_universe,
             topology,
             spatial_extent_contact_layer,
+            tube_radius,
             pbc_indices,
             start_frame,
             end_frame,
@@ -58,6 +60,7 @@ def _compute_distribution_for_system_with_one_periodic_direction(
     universe,
     topology,
     spatial_extent_contact_layer: float,
+    tube_radius: float,
     pbc_indices,
     start_frame: int,
     end_frame: int,
@@ -69,6 +72,7 @@ def _compute_distribution_for_system_with_one_periodic_direction(
         universe : MDAnalysis universes to be analysed.
         topology : ASE atoms object containing information about topology.
         spatial_extent_contact_layer (float): How far ranges the water contact layer.
+        tube_radius (float) : radius of the tube in A.
         pbc_indices : Direction indices in which system is periodic
         start_frame (int) : Start frame for analysis.
         end_frame (int) : End frame for analysis.
@@ -90,6 +94,9 @@ def _compute_distribution_for_system_with_one_periodic_direction(
     # define one "reference atom (ideally in solid phase)"
     # this will serve as our anchor for computing the free energy profile
     anchor_coordinates = solid_atoms[10].position
+
+    # compute circumference based on diameter
+    tube_circumference = 2 * np.pi * tube_radius
 
     # define arrays where the coordinates of oxygens and solid atoms will be saved in
     liquid_contact_coord1 = []
@@ -143,14 +150,6 @@ def _compute_distribution_for_system_with_one_periodic_direction(
 
         # define center of mass of solid now
         solid_COM = solid_atoms.center_of_mass()
-
-        # define tube radius and circumference
-        tube_radius = np.mean(
-            np.linalg.norm(
-                solid_atoms.positions[:, not_pbc_indices] - solid_COM[not_pbc_indices], axis=1
-            )
-        )
-        tube_circumference = 2 * np.pi * tube_radius
 
         # now compute vector from liquid atoms from the center axis of the solid
         vector_liquid_to_central_axis = liquid_atoms.positions - solid_COM

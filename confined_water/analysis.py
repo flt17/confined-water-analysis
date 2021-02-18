@@ -1610,6 +1610,14 @@ class Simulation:
         # compute spatial extent of contact layer
         spatial_extent_contact_layer = self.get_water_contact_layer_on_interface()
 
+        # compute average tube radius if tube
+        if len(pbc_dimensions_indices) == 1:
+            tube_radius = self.compute_tube_radius(
+                pbc_dimensions_indices, start_time, end_time, frame_frequency
+            )
+        else:
+            tube_radius = None
+
         # loop over all universes
         for count_universe, universe in enumerate(tmp_position_universes):
 
@@ -1625,5 +1633,6 @@ class Simulation:
                 start_frame,
                 end_frame,
                 frame_frequency,
+                tube_radius,
             )
         return distribution_liquid, distribution_solid

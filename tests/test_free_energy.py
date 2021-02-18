@@ -23,6 +23,11 @@ class TestComputeAtomicProbabilities:
 
         spatial_expansion_contact_layer = simulation.get_water_contact_layer_on_interface()
 
+        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(
+            simulation.pbc_dimensions
+        )
+        tube_radius = simulation.compute_tube_radius(pbc_dimensions_indices)
+
         free_energy.compute_spatial_distribution_of_atoms_on_interface(
             simulation.position_universes[0],
             simulation.topology,
@@ -31,6 +36,7 @@ class TestComputeAtomicProbabilities:
             start_frame=0,
             end_frame=100,
             frame_frequency=1,
+            tube_radius=tube_radius,
         )
 
     def test_returns_probabilities_for_sheet(self):
