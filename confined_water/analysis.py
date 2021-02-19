@@ -85,9 +85,6 @@ class Simulation:
         # set system periodicity per default:
         self.set_pbc_dimensions("xyz")
 
-        # set default temperature to 330 K:
-        self.set_simulation_temperature(330)
-
         self.radial_distribution_functions = {}
         self.density_profiles = {}
         self.hydrogen_bonding = []
@@ -97,6 +94,11 @@ class Simulation:
         self.friction_coefficients = {}
         self.velocity_autocorrelation_function = {}
         self.diffusion_coefficients_via_GK = {}
+        self.free_energy_profile = free_energy.FreeEnergyProfile()
+        self.tube_radius = 0
+
+        # set default temperature to 330 K:
+        self.set_simulation_temperature(330)
 
     def read_in_simulation_data(
         self,
@@ -199,6 +201,7 @@ class Simulation:
         """
 
         self.temperature = temperature
+        self.free_energy_profile.temperature = temperature
 
     def set_pbc_dimensions(self, pbc_dimensions: str):
         """
@@ -1613,12 +1616,12 @@ class Simulation:
 
         # compute average tube radius if tube
         if len(pbc_dimensions_indices) == 1:
-            tube_radius = self.compute_tube_radius(
+            self.tube_radius = self.compute_tube_radius(
                 pbc_dimensions_indices, start_time, end_time, frame_frequency
             )
 
         else:
-            tube_radius = None
+            self.tube_radius = 0
 
         # loop over all universes
         for count_universe, universe in enumerate(tmp_position_universes):
@@ -1635,19 +1638,41 @@ class Simulation:
                 start_frame,
                 end_frame,
                 frame_frequency,
-                tube_radius,
+                self.tube_radius,
                 tube_length_in_unit_cells,
             )
 
-        (
-            liquid_free_energy_profile_data,
-            solid_free_energy_profile_data,
-        ) = free_energy.prepare_for_plotting(
-            distribution_liquid,
-            distribution_solid,
-            self.topology,
-            tube_radius,
-            tube_length_in_unit_cells,
-        )
+        # save as attribute of the class instance
+        self.free_energy_profile.distribution_liquid = distribution_liquid
+        self.free_energy_profile.distribution_solid = distribution_solid
 
-        return distribution_liquid, distribution_solid
+    def prepare_plotting_free_energy_profile(
+        self, number_of_bins: int, multiples_of_unit_cell, plot_replica: int = 3
+    ):
+        """
+        Uses the previously computed distributions of atom positions to compute free energy
+        and prepare the arrays to be plotted nicely.
+        Arguments:
+            number_of_bins (int): number of bins used for larger dimension, lower dimensions will be adjusted.
+            multiples_of_unit_cell: integer array of periodic replica in 2D.
+            plot_replica (int) : Number of replica of the unit cell plotted in 2D.
+        """
+
+        # get periodic directions:
+        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(self.pbc_dimensions)
+
+        # raise error if tube as system but no tube radius given
+        if len(pbc_dimensions_indices) == 1 and self.tube_radius == 0:
+            raise UnphysicalValue(
+                f"Tube radius is set to 0. Please compute the tube radius first which should be done in the free energy routine"
+            )
+
+        # do everything in the free energy class
+        self.free_energy_profile.prepare_for_plotting(
+            self.topology,
+            pbc_dimensions_indices,
+            number_of_bins,
+            multiples_of_unit_cell,
+            plot_replica,
+            self.tube_radius,
+        )

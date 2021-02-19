@@ -2,8 +2,285 @@ import numpy as np
 import sys
 from tqdm.notebook import tqdm
 
+from findpeaks import findpeaks
+
 sys.path.append("../")
 from confined_water import utils
+from confined_water import global_variables
+from confined_water import analysis
+
+
+class FreeEnergyProfile:
+    """
+    Gather all information/data about Free energy profile
+
+    Attributes:
+
+    Methods:
+
+    """
+
+    def __init__(self):
+
+        self.distribution_solid = []
+        self.distribution_liquid = []
+        self.temperature = 330
+
+        self.free_energy_profile_liquid = []
+        self.solid_atoms_on_free_energy_profile = {}
+
+    def prepare_for_plotting(
+        self,
+        topology,
+        pbc_indices,
+        number_of_bins: int,
+        multiples_of_unit_cell,
+        plot_replica: int = 3,
+        tube_radius: float = None,
+    ):
+        """
+        Prepare previously computed distributions of liquid and solid atoms
+        for being plotted as free energy profile.
+        Arguments:
+            topology : ASE atoms object wih topology of system.
+            pbc_indices: Direction indices in which system is periodic.
+            number_of_bins (int): number of bins used for larger dimension, lower dimensions will be adjusted.
+            multiples_of_unit_cell: integer array of periodic replica in 2D.
+            plot_replica (int) : Number of replica of the unit cell plotted in 2D.
+            tube_radius (float) : tube radius of tube in A.
+
+        Returns:
+        """
+
+        # define dimensions not periodic, indices
+        not_pbc_indices = list(set(pbc_indices) ^ set([0, 1, 2]))
+
+        # start by setting bins and ranges for histogram
+        # thereby, it is important to distinguish between sheet and tube
+        # replica of unit cell in x and y direction
+        # note in case of tube y is axial and x is angular
+        dim_x = multiples_of_unit_cell[0]
+        dim_y = multiples_of_unit_cell[1]
+
+        # define ranges
+        range_x = (
+            [0, 2 * np.pi * tube_radius]
+            if len(pbc_indices) == 1
+            else [0, topology.get_cell_lengths_and_angles()[not_pbc_indices[0]]]
+        )
+
+        range_y = (
+            [0, topology.get_cell_lengths_and_angles()[pbc_indices][0]]
+            if len(pbc_indices) == 1
+            else [0, topology.get_cell_lengths_and_angles()[not_pbc_indices[1]]]
+        )
+
+        # compute ratio of dimensions per unit cell
+        ratio_y_to_x = range_y[1] / dim_y / (range_x[1] / dim_x)
+
+        # this gives the number of bins per unit cell in each direction
+        if ratio_y_to_x < 1:
+
+            bins_x_unit = number_of_bins
+            bins_y_unit = int(np.round(number_of_bins * ratio_y_to_x))
+
+        else:
+
+            bins_x_unit = int(np.round(number_of_bins / ratio_y_to_x))
+            bins_y_unit = number_of_bins
+
+        # now create bins for system
+        bins_x_total = bins_x_unit * dim_x
+        bins_y_total = bins_y_unit * dim_y
+
+        # create now histogram with these options
+        # first for liquid
+        hist_liquid, xedges_total, yedges_total = np.histogram2d(
+            self.distribution_liquid[:, 1],
+            self.distribution_liquid[:, 0],
+            bins=[bins_x_total, bins_y_total],
+            range=[range_x, range_y],
+            density=False,
+        )
+
+        # project histogram on unit cell
+        hist_liquid_projected = self._project_histogram_to_unit_cell(
+            hist_liquid, bins_x_unit, bins_y_unit, multiples_of_unit_cell
+        )
+
+        # now normalise to get a probablity
+        hist_liquid_projected_normalised = hist_liquid_projected / np.sum(hist_liquid_projected)
+
+        # now multiply this representation according to given number of replica
+        hist_liquid_final = np.tile(hist_liquid_projected_normalised, [plot_replica, plot_replica])
+
+        # now, finally, compute, free energy
+        free_energy_profile_liquid = (
+            -self.temperature
+            * global_variables.BOLTZMANN
+            / global_variables.EV_TO_JOULE
+            * np.log(hist_liquid_final / np.max(hist_liquid_final))
+        )
+
+        # adapt xedges and yedges accordingly
+        xedges_free_energy_liquid = np.linspace(
+            0, range_x[1] / dim_x * plot_replica, bins_x_unit * plot_replica + 1
+        )
+
+        yedges_free_energy_liquid = np.linspace(
+            0, range_y[1] / dim_y * plot_replica, bins_y_unit * plot_replica + 1
+        )
+
+        self.free_energy_profile_liquid = [
+            free_energy_profile_liquid,
+            xedges_free_energy_liquid,
+            yedges_free_energy_liquid,
+        ]
+
+        # repeat this proceedure in slightly different form for solid
+        # define edges for unit cell
+
+        xedges_unit = np.linspace(0, range_x[1] / dim_x, bins_x_unit + 1)
+
+        yedges_unit = np.linspace(0, range_y[1] / dim_y, bins_y_unit + 1)
+
+        # loop over solid dictionary:
+        for element, distribution in self.distribution_solid.items():
+            hist_solid, __, __ = np.histogram2d(
+                distribution[:, 1],
+                distribution[:, 0],
+                bins=[bins_x_total, bins_y_total],
+                range=[range_x, range_y],
+                density=False,
+            )
+
+            # project histogram on unit cell
+            hist_solid_projected = self._project_histogram_to_unit_cell(
+                hist_solid, bins_x_unit, bins_y_unit, multiples_of_unit_cell
+            )
+
+            # compute number of atoms which should be in unit cell, currently only equal pairs possible
+            number_of_atoms_of_element_in_unit_cell = (
+                len(np.where(np.asarray(topology.get_chemical_symbols()) == element)[0])
+                / dim_y
+                / dim_x
+            )
+
+            # get positions of peaks
+            coordinates_per_element_unit = self._get_solid_coordinates_from_histogram(
+                hist_solid_projected,
+                xedges_unit,
+                yedges_unit,
+                number_of_atoms_of_element_in_unit_cell,
+            )
+
+            # eventually, create coordinates for plotted replica
+            coordinates_per_element = np.concatenate(
+                [
+                    coordinates_per_element_unit
+                    + [
+                        x_rep * xedges_unit[-1],
+                        y_rep * yedges_unit[-1],
+                    ]
+                    for x_rep in np.arange(plot_replica)
+                    for y_rep in np.arange(plot_replica)
+                ]
+            )
+
+            # save these coordinates to dictionary
+            self.solid_atoms_on_free_energy_profile[element] = coordinates_per_element
+
+    def _project_histogram_to_unit_cell(
+        self, histogram, bins_x_unit, bins_y_unit, multiples_of_unit_cell
+    ):
+        """
+        Returns histogram projecte to unit cell.
+        Arguments:
+                histogram: numpy 2D histogram with the distribution of atoms.
+                bins_x_unit: number of bins in x direction unit cell.
+                bins_y_unit: number of bins in x direction unit cell.
+                multiples_of_unit_cell: integer array of periodic replica in 2D.
+
+        Returns:
+        """
+
+        # reshape histogram in y-direction first
+        histogram_y_reshaped = histogram.reshape(
+            histogram.shape[0], multiples_of_unit_cell[1], bins_y_unit
+        )
+
+        # now sum over projections
+        histogram_y_summed = np.sum(histogram_y_reshaped, axis=1)
+
+        # do the same thing with x direction
+        histogram_y_summed = histogram_y_summed.T
+        histogram_x_reshaped = histogram_y_summed.reshape(
+            histogram_y_summed.shape[0], multiples_of_unit_cell[0], bins_x_unit
+        )
+        histogram_x_summed = np.sum(histogram_x_reshaped, axis=1)
+
+        return histogram_x_summed
+
+    def _get_solid_coordinates_from_histogram(
+        self, hist_solid_projected, xedges_unit, yedges_unit, expected_number_of_atoms
+    ):
+        """
+        Returns coordinates of solid atoms in unit cell for given histogram of element.
+        Arguments:
+                peak_indices: Indices of peaks found.
+                xedges_unit: Binned x range of unit cell.
+                yedges_unit: Binned x range of unit cell.
+                expected_number_of_atoms: How many atoms are expected for this element in unit cell.
+
+        Returns:
+                Coordinates of element in unit cell.
+        """
+        # Initialise peak finder
+
+        peak_finder = findpeaks(method="mask")
+
+        # repeat histogram to avoid pbc issues
+        histogram_repeated = np.tile(hist_solid_projected, [3, 3])
+
+        # compute xedges and yedges
+        xedges_supercell = np.linspace(0, xedges_unit[-1] * 3, 3 * (len(xedges_unit) - 1) + 1)
+        yedges_supercell = np.linspace(0, yedges_unit[-1] * 3, 3 * (len(yedges_unit) - 1) + 1)
+
+        # find peaks in 2D histograms
+        peaks_found = peak_finder.fit(histogram_repeated)
+        peaks_indices = np.where(peaks_found["Xdetect"])
+
+        # compute preliminary coordinates
+        x_coordinates = 0.5 * (
+            xedges_supercell[peaks_indices[1]] + xedges_supercell[peaks_indices[1] + 1]
+        )
+        y_coordinates = 0.5 * (
+            yedges_supercell[peaks_indices[0]] + yedges_supercell[peaks_indices[0] + 1]
+        )
+        preliminary_coordinates = np.column_stack((x_coordinates, y_coordinates))
+
+        # get now coordinates of 2,2 unit cell which has no pbc issues
+        unit_cell_peaks_without_pbc_issues = np.where(
+            (preliminary_coordinates[:, 0] >= xedges_unit[-1] + xedges_unit[1] * 0.5)
+            & (preliminary_coordinates[:, 0] < 2 * xedges_unit[-1] + xedges_unit[1] * 0.5)
+            & (preliminary_coordinates[:, 1] >= yedges_unit[-1] + yedges_unit[1] * 0.5)
+            & (preliminary_coordinates[:, 1] < 2 * (yedges_unit[-1]) + yedges_unit[1] * 0.5)
+        )
+
+        if len(unit_cell_peaks_without_pbc_issues[0]) != expected_number_of_atoms:
+
+            raise analysis.UnphysicalValue(
+                f" Severe error: you found more solid atoms in your unit cell than you should."
+                f" There are {len(unit_cell_peaks_without_pbc_issues[0])} atoms from the peak analysis."
+                f" You should have found {expected_number_of_atoms}."
+                f" Using more bins or sampling longer could help."
+            )
+
+        solid_coordinates_unit_cell = preliminary_coordinates[
+            unit_cell_peaks_without_pbc_issues
+        ] - [xedges_unit[-1], yedges_unit[-1]]
+
+        return solid_coordinates_unit_cell
 
 
 def compute_spatial_distribution_of_atoms_on_interface(
@@ -34,7 +311,7 @@ def compute_spatial_distribution_of_atoms_on_interface(
     solid_types = list(set(np.unique(position_universe.atoms.types)) ^ set(["O", "H"]))
 
     # define how many samples will be taken
-    number_of_samples = int((end_frame - start_frame) / frame_frequency)
+    number_of_samples = np.arange(start_frame, end_frame, frame_frequency).shape[0]
 
     if len(pbc_indices) == 1:
 
@@ -369,13 +646,3 @@ def _get_atom_ids_on_same_tube_axis(solid_atoms, tube_length_in_unit_cells: int,
 
     # return indices closest based on tube length
     return ids_candidate_atoms_on_axis_with_0[0 : 2 * tube_length_in_unit_cells]
-
-
-def prepare_for_plotting(
-    distribution_liquid,
-    distribution_solid,
-    topology,
-    tube_radius: float,
-    tube_length_in_unit_cells: int,
-):
-    pass
