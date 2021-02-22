@@ -504,7 +504,7 @@ class Simulation:
         """
 
         # determine reference atoms, here only solid atoms (B,N,C) allowed
-        reference_species = ["B", "N", "C", "Cl", "Na"]
+        reference_species = ["B", "N", "C", "Cl", "Na", "CL", "NA"]
         reference_species_string = " ".join(reference_species)
 
         if not set(self.species_in_system).intersection(reference_species):

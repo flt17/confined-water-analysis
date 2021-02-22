@@ -398,7 +398,7 @@ def _compute_distribution_for_system_with_one_periodic_direction(
     # universe.atoms.pack_into_box(box=topology.get_cell_lengths_and_angles(), inplace=True)
 
     # start by separating solid atoms from liquid atoms
-    solid_atoms = universe.select_atoms("name B N C Na Cl")
+    solid_atoms = universe.select_atoms("name B N C Na Cl NA CL")
     liquid_atoms = universe.select_atoms("name O H")
 
     # this will serve as our anchor for translation for computing the free energy profile
