@@ -53,6 +53,7 @@ class FreeEnergyProfile:
         """
 
         # define dimensions not periodic, indices
+
         not_pbc_indices = list(set(pbc_indices) ^ set([0, 1, 2]))
 
         # start by setting bins and ranges for histogram
@@ -66,13 +67,13 @@ class FreeEnergyProfile:
         range_x = (
             [0, 2 * np.pi * tube_radius]
             if len(pbc_indices) == 1
-            else [0, topology.get_cell_lengths_and_angles()[not_pbc_indices[0]]]
+            else [0, topology.get_cell_lengths_and_angles()[pbc_indices][0]]
         )
 
         range_y = (
             [0, topology.get_cell_lengths_and_angles()[pbc_indices][0]]
             if len(pbc_indices) == 1
-            else [0, topology.get_cell_lengths_and_angles()[not_pbc_indices[1]]]
+            else [0, topology.get_cell_lengths_and_angles()[pbc_indices][1]]
         )
 
         # compute ratio of dimensions per unit cell
@@ -96,8 +97,8 @@ class FreeEnergyProfile:
         # create now histogram with these options
         # first for liquid
         hist_liquid, xedges_total, yedges_total = np.histogram2d(
-            self.distribution_liquid[:, 1],
             self.distribution_liquid[:, 0],
+            self.distribution_liquid[:, 1],
             bins=[bins_x_total, bins_y_total],
             range=[range_x, range_y],
             density=False,
@@ -147,8 +148,8 @@ class FreeEnergyProfile:
         # loop over solid dictionary:
         for element, distribution in self.distribution_solid.items():
             hist_solid, __, __ = np.histogram2d(
-                distribution[:, 1],
                 distribution[:, 0],
+                distribution[:, 1],
                 bins=[bins_x_total, bins_y_total],
                 range=[range_x, range_y],
                 density=False,
@@ -312,7 +313,6 @@ def compute_spatial_distribution_of_atoms_on_interface(
 
     # define how many samples will be taken
     number_of_samples = np.arange(start_frame, end_frame, frame_frequency).shape[0]
-
     if len(pbc_indices) == 1:
 
         # compute probabilities for tube
@@ -352,6 +352,7 @@ def compute_spatial_distribution_of_atoms_on_interface(
 
     # now loop over all atom types
     for element in solid_types:
+
         # get indices
         indices_for_element = np.where(solid_atoms.types == element)
 
@@ -417,8 +418,12 @@ def _compute_distribution_for_system_with_one_periodic_direction(
     solid_coord1 = []
     solid_coord2 = []
 
-    # solid_1 = np.zeros((int((end_frame - start_frame) / frame_frequency), len(solid_atoms), 2))
+    liquid_contact_coord1_all = []
+    liquid_contact_coord2_all = []
+    solid_coord1_all = []
+    solid_coord2_all = []
 
+    number_of_samples = len(np.arange(start_frame, end_frame, frame_frequency))
     # Loop over trajectory
     for count_frames, frames in enumerate(
         tqdm((universe.trajectory[start_frame:end_frame])[::frame_frequency])
@@ -489,8 +494,8 @@ def _compute_distribution_for_system_with_one_periodic_direction(
 
         # for chosen atoms compute position in periodic and angular direction
         # periodic is easy
-        liquid_contact_coord1 = np.append(
-            liquid_contact_coord1,
+        liquid_contact_coord2 = np.append(
+            liquid_contact_coord2,
             liquid_atoms_in_contact_positions[:, pbc_indices] + solid_COM[pbc_indices],
         )
 
@@ -505,11 +510,11 @@ def _compute_distribution_for_system_with_one_periodic_direction(
         angular_component_liquid_contact = (
             tube_circumference * (angles_liquid_contact_central_axis + np.pi) / (2 * np.pi)
         )
-        liquid_contact_coord2 = np.append(liquid_contact_coord2, angular_component_liquid_contact)
+        liquid_contact_coord1 = np.append(liquid_contact_coord1, angular_component_liquid_contact)
 
         # do the same thing for solid
         vector_solid_to_central_axis = solid_atoms.positions - solid_COM
-        solid_coord1 = np.append(solid_coord1, solid_atoms.positions[:, pbc_indices])
+        solid_coord2 = np.append(solid_coord2, solid_atoms.positions[:, pbc_indices])
 
         angles_solid_central_axis = np.arctan2(
             vector_solid_to_central_axis[:, not_pbc_indices[1]],
@@ -520,11 +525,24 @@ def _compute_distribution_for_system_with_one_periodic_direction(
             tube_circumference * (angles_solid_central_axis + np.pi) / (2 * np.pi)
         )
 
-        solid_coord2 = np.append(solid_coord2, angular_component_solid)
+        solid_coord1 = np.append(solid_coord1, angular_component_solid)
+
+        # making code more efficient, ugly bu useful
+        if count_frames % 1000 == 0 or count_frames == number_of_samples - 1:
+
+            # save full arrays to global array and empty local to free memory and speed up loop
+            liquid_contact_coord1_all = np.append(liquid_contact_coord1_all, liquid_contact_coord1)
+            liquid_contact_coord1 = []
+            liquid_contact_coord2_all = np.append(liquid_contact_coord2_all, liquid_contact_coord2)
+            liquid_contact_coord2 = []
+            solid_coord1_all = np.append(solid_coord1_all, solid_coord1)
+            solid_coord1 = []
+            solid_coord2_all = np.append(solid_coord2_all, solid_coord2)
+            solid_coord2 = []
 
     # stack everything
-    liquid_contact_2d = np.column_stack((liquid_contact_coord1, liquid_contact_coord2))
-    solid_2d = np.column_stack((solid_coord1, solid_coord2))
+    liquid_contact_2d = np.column_stack((liquid_contact_coord1_all, liquid_contact_coord2_all))
+    solid_2d = np.column_stack((solid_coord1_all, solid_coord2_all))
 
     return liquid_contact_2d, solid_2d
 
@@ -562,7 +580,7 @@ def _compute_distribution_for_system_with_two_periodic_directions(
     periodic_vector[pbc_indices] = 1
 
     # wrap atoms in box
-    universe.atoms.pack_into_box(box=topology.get_cell_lengths_and_angles(), inplace=True)
+    # universe.atoms.pack_into_box(box=topology.get_cell_lengths_and_angles(), inplace=True)
 
     # start by separating solid atoms from liquid atoms
     solid_atoms = universe.select_atoms("name B N C Na Cl")
@@ -571,23 +589,29 @@ def _compute_distribution_for_system_with_two_periodic_directions(
     liquid_atoms = universe.select_atoms("name O")
 
     # this will serve as our anchor for computing the free energy profile
-    anchor_coordinates = universe.atoms.center_of_mass()
+    anchor_coordinates = solid_atoms.center_of_mass()
 
     # define arrays where the coordinates of oxygens and solid atoms will be saved in
     liquid_contact_coord1 = []
     liquid_contact_coord2 = []
-    solid_all = np.zeros((int((end_frame - start_frame) / frame_frequency), len(solid_atoms), 2))
+    solid_all = []
+
+    liquid_contact_coord1_all = []
+    liquid_contact_coord2_all = []
+    solid_all_all = []
+
+    number_of_samples = len(np.arange(start_frame, end_frame, frame_frequency))
 
     # Loop over trajectory
     for count_frames, frames in enumerate(
         tqdm((universe.trajectory[start_frame:end_frame])[::frame_frequency])
     ):
         # wrap atoms in box
-        universe.atoms.pack_into_box(box=topology.get_cell_lengths_and_angles(), inplace=True)
+        # universe.atoms.pack_into_box(box=topology.get_cell_lengths_and_angles(), inplace=True)
 
         # we start by making the frames translationally invariant
         # This is done by computing the translation and substracting it
-        translation_from_frame0 = universe.atoms.center_of_mass() - anchor_coordinates
+        translation_from_frame0 = solid_atoms.center_of_mass() - anchor_coordinates
         universe.atoms.positions -= translation_from_frame0
 
         # wrap atoms in box
@@ -616,12 +640,23 @@ def _compute_distribution_for_system_with_two_periodic_directions(
         )
 
         # save solid
-        solid_all[count_frames] = solid_atoms.positions[:, pbc_indices]
+        solid_all = np.append(solid_all, solid_atoms.positions[:, pbc_indices])
+
+        # making code more efficient, ugly but useful
+        if count_frames % 1000 == 0 or count_frames == number_of_samples - 1:
+
+            # save full arrays to global array and empty local to free memory and speed up loop
+            liquid_contact_coord1_all = np.append(liquid_contact_coord1_all, liquid_contact_coord1)
+            liquid_contact_coord1 = []
+            liquid_contact_coord2_all = np.append(liquid_contact_coord2_all, liquid_contact_coord2)
+            liquid_contact_coord2 = []
+            solid_all_all = np.append(solid_all_all, solid_all)
+            solid_all = []
 
     # put coords of liquid together
-    liquid_contact_2d = np.column_stack((liquid_contact_coord1, liquid_contact_coord2))
+    liquid_contact_2d = np.column_stack((liquid_contact_coord1_all, liquid_contact_coord2_all))
 
-    return liquid_contact_2d, np.concatenate(solid_all)
+    return liquid_contact_2d, (solid_all_all)
 
 
 def _get_atom_ids_on_same_tube_axis(solid_atoms, tube_length_in_unit_cells: int, not_pbc_indices):
