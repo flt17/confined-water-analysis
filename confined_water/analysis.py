@@ -1151,12 +1151,10 @@ class Simulation:
 
             if selected_species_string == "O H":
                 # compute center of mass of water molecules
-                center_of_masses_water_molecules = np.asarray(
-                    [
-                        atoms_selected[3 * index_molecule : 3 * index_molecule + 3].center_of_mass()
-                        for index_molecule in np.arange(number_of_tracers)
-                    ]
-                )
+                center_of_masses_water_molecules = [
+                    atoms_selected[atoms_selected.resids == index_molecule + 1].center_of_mass()
+                    for index_molecule in np.arange(number_of_tracers)
+                ]
 
                 saved_velocities_atoms_selected[count_frames] = (
                     center_of_masses_water_molecules - center_of_mass_selected_atoms
