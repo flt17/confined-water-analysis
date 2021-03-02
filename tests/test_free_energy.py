@@ -8,9 +8,10 @@ from confined_water import free_energy
 
 class TestComputeAtomicProbabilities:
     def test_returns_probabilities_for_tube(self):
-        path = "./files/water_in_carbon_nanotube/classical"
+        path = "./files/water_in_carbon_nanotube/m12_n12/classical"
 
         simulation = analysis.Simulation(path)
+
         simulation.read_in_simulation_data(read_positions=True)
         simulation.set_sampling_times(
             start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
@@ -37,6 +38,7 @@ class TestComputeAtomicProbabilities:
             end_frame=100,
             frame_frequency=1,
             tube_radius=tube_radius,
+            tube_length_in_unit_cells=6,
         )
 
     def test_returns_probabilities_for_sheet(self):

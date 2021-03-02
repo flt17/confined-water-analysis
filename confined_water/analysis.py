@@ -100,6 +100,23 @@ class Simulation:
         # set default temperature to 330 K:
         self.set_simulation_temperature(330)
 
+    def _set_up_water_topology(self):
+        """
+        Setup topology for water molecules so that we know which atoms form a water..
+        Arguments:
+        Returns:
+
+        """
+
+        # loop over all universes
+
+        for count_universe, universe in enumerate(self.position_universes):
+            # based on read in trajectory and topology get all oxygen atoms
+            oxygen_atoms = universe.select_atoms("name O")
+
+            # get hydrogen_atoms
+            hydrogen_atoms = universe.select_atoms("name H")
+
     def read_in_simulation_data(
         self,
         read_positions: bool = True,

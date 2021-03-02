@@ -29,7 +29,7 @@ class TestSimulationReadInSimulationData:
         assert len(simulation.position_universes) == 1
 
     def test_sets_up_summed_forces_for_quantum_simulation(self):
-        path = "./files/water_in_carbon_nanotube/quantum"
+        path = "./files/water_in_carbon_nanotube/m12_n12/quantum"
 
         simulation = analysis.Simulation(path)
 
@@ -38,7 +38,7 @@ class TestSimulationReadInSimulationData:
         assert np.all(simulation.summed_forces)
 
     def test_sets_up_summed_forces_for_classical_simulation(self):
-        path = "./files/water_in_carbon_nanotube/classical"
+        path = "./files/water_in_carbon_nanotube/m12_n12/classical"
 
         simulation = analysis.Simulation(path)
 
@@ -47,7 +47,7 @@ class TestSimulationReadInSimulationData:
         assert np.all(simulation.summed_forces)
 
     def test_sets_up_velocity_universe_for_classical_simulation(self):
-        path = "./files/water_in_carbon_nanotube/classical"
+        path = "./files/water_in_carbon_nanotube/m12_n12/classical"
 
         simulation = analysis.Simulation(path)
 
@@ -174,7 +174,7 @@ class TestSimulation_ComputeDensityProfileAlongCartesianAxis:
 class TestSimulation_ComputeDensityProfileInRadialDirection:
     def test_returns_profile_radial_direction_parallel_to_z_axis(self):
 
-        path = "./files/water_in_carbon_nanotube/classical"
+        path = "./files/water_in_carbon_nanotube/m12_n12/classical"
 
         simulation = analysis.Simulation(path)
 
@@ -297,7 +297,7 @@ class TestSimulation_ComputeMeanSquaredDisplacement:
 class TestSimulation_ComputeDiffusionCoefficientViaGreenKubo:
     def test_returns_diffusion_coefficient(self):
 
-        path = "./files/water_in_carbon_nanotube/classical"
+        path = "./files/water_in_carbon_nanotube/m12_n12/classical"
 
         simulation = analysis.Simulation(path)
         simulation.read_in_simulation_data(
@@ -318,7 +318,7 @@ class TestSimulation_ComputeDiffusionCoefficientViaGreenKubo:
         assert len(simulation.diffusion_coefficients_via_GK["O - ct: 1000"]) == 3
 
     def test_raises_error_when_correlation_time_is_too_high(self):
-        path = "./files/water_in_carbon_nanotube/quantum"
+        path = "./files/water_in_carbon_nanotube/m12_n12/quantum"
 
         simulation = analysis.Simulation(path)
         simulation.read_in_simulation_data(read_positions=False, read_summed_forces=True)
@@ -334,7 +334,7 @@ class TestSimulation_ComputeDiffusionCoefficientViaGreenKubo:
             )
 
     def test_raises_error_when_number_of_blocks_is_too_high(self):
-        path = "./files/water_in_carbon_nanotube/quantum"
+        path = "./files/water_in_carbon_nanotube/m12_n12/quantum"
 
         simulation = analysis.Simulation(path)
         simulation.read_in_simulation_data(read_positions=False, read_summed_forces=True)
@@ -350,7 +350,7 @@ class TestSimulation_ComputeDiffusionCoefficientViaGreenKubo:
             )
 
     def test_returns_correct_autocorrelation_function(self):
-        path = "./files/water_in_carbon_nanotube/classical"
+        path = "./files/water_in_carbon_nanotube/m12_n12/classical"
 
         simulation = analysis.Simulation(path)
         simulation.read_in_simulation_data(read_positions=True, read_summed_forces=True)
@@ -408,7 +408,7 @@ class TestSimulation_GetWaterContactLayerOnInterface:
         assert spatial_expansion_contact_layer > 0
 
     def test_returns_contact_layer_for_one_dimensions(self):
-        path = "./files/water_in_carbon_nanotube/classical"
+        path = "./files/water_in_carbon_nanotube/m12_n12/classical"
 
         simulation = analysis.Simulation(path)
 

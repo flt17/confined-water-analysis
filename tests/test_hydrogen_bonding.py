@@ -32,7 +32,7 @@ class TestHydrogenBondingFindAcceptorDonorPairs:
 
     def test_returns_pandas_dataframe_for_carbon_nanotube(self):
 
-        path = "./files/water_in_carbon_nanotube/classical"
+        path = "./files/water_in_carbon_nanotube/m12_n12/classical"
 
         simulation = analysis.Simulation(path)
 
