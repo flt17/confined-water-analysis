@@ -100,22 +100,99 @@ class Simulation:
         # set default temperature to 330 K:
         self.set_simulation_temperature(330)
 
-    def _set_up_water_topology(self):
+    def _set_up_water_topology(
+        self,
+    ):
         """
         Setup topology for water molecules so that we know which atoms form a water..
         Arguments:
+
         Returns:
 
         """
 
-        # loop over all universes
+        # start with doing the solid
 
+        solid_atoms = self.position_universes[0].select_atoms("name B N Na Cl C")
+
+        # all solids as one residuum for each universe
         for count_universe, universe in enumerate(self.position_universes):
-            # based on read in trajectory and topology get all oxygen atoms
-            oxygen_atoms = universe.select_atoms("name O")
 
-            # get hydrogen_atoms
-            hydrogen_atoms = universe.select_atoms("name H")
+            solid_residuum = universe.add_Residue(
+                resid=0,
+                resname="Solid",
+                resnum=0,
+                icode="",
+            )
+
+            universe.atoms[solid_atoms.indices].residues = solid_residuum
+
+        # check if we need to do the same thing for velocities
+        if hasattr(self, "velocity_universes"):
+            for count_universe, universe in enumerate(self.velocity_universes):
+
+                solid_residuum = universe.add_Residue(
+                    resid=0,
+                    resname="Solid",
+                    resnum=0,
+                    icode="",
+                )
+
+                universe.atoms[solid_atoms.indices].residues = solid_residuum
+
+        # based on read in trajectory and topology get all oxygen atoms
+        oxygen_atoms = self.position_universes[0].select_atoms("name O")
+
+        # get hydrogen_atoms
+        hydrogen_atoms = self.position_universes[0].select_atoms("name H")
+
+        # now loop over all oxygen atoms and find hydrogen atoms that fit:
+        for count_oxygen, oxygen in enumerate(oxygen_atoms):
+
+            # compute
+            vector_to_all_hydrogens = hydrogen_atoms.positions - oxygen.position
+
+            # make sure it satisfies pbc
+            vector_to_all_hydrogens_pbc = (
+                utils.apply_minimum_image_convention_to_interatomic_vectors(
+                    vector_to_all_hydrogens, self.topology.cell, self.pbc_dimensions
+                )
+            )
+
+            # compute distance and sort arguments
+            indices_hydrogens_sorted_by_distance = np.argsort(
+                np.linalg.norm(vector_to_all_hydrogens_pbc, axis=1)
+            )
+            # cluster indices of atoms
+            atom_indices_water = np.append(
+                hydrogen_atoms.indices[indices_hydrogens_sorted_by_distance[0:2]], oxygen.index
+            )
+
+            # now we need to combine them to one residue for each universe
+            for count_universe, universe in enumerate(self.position_universes):
+
+                # define residuum for each oxygen/water
+                current_residuum = universe.add_Residue(
+                    resid=count_oxygen + 1,
+                    resname=f"W{count_oxygen+1}",
+                    resnum=count_oxygen + 1,
+                    icode="",
+                )
+
+                universe.atoms[atom_indices_water].residues = current_residuum
+
+            # check if we need to do the same thing for velocities
+            if hasattr(self, "velocity_universes"):
+                for count_universe, universe in enumerate(self.velocity_universes):
+
+                    current_residuum = universe.add_Residue(
+                        resid=count_oxygen,
+                        resname=f"W{count_oxygen+1}",
+                        resnum=count_oxygen,
+                        icode="",
+                    )
+
+                    universe.atoms[atom_indices_water].residues = current_residuum
 
     def read_in_simulation_data(
         self,
@@ -129,6 +206,7 @@ class Simulation:
         Setup all selected simulation data.
         Arguments:
             read_positions (bool) : Whether to read in position trajectories.
+            read_velocities (bool) : Whether to read in velocity trajectories.
             read_summed_forces (bool) : Whether to read in separately printed summed forces.
             topology_file_name (str) : Name of the topology file (currently only pdb). If not given, first file taken.
 
@@ -206,6 +284,10 @@ class Simulation:
                 * global_variables.HARTREE_TO_EV
                 / global_variables.BOHR_TO_ANGSTROM
             )
+
+        # now check connectivity of waters and implement scheme for given universes
+        if read_positions:
+            self._set_up_water_topology()
 
     def set_simulation_temperature(self, temperature: float):
         """

@@ -11,6 +11,14 @@ from confined_water import analysis
 
 
 class TestSimulationReadInSimulationData:
+    def test_sets_up_connectivity_correctly(self):
+        path = "./files/water_in_carbon_nanotube/m30_n30"
+        simulation = analysis.Simulation(path)
+
+        simulation.set_pbc_dimensions(pbc_dimensions="z")
+        simulation.read_in_simulation_data(read_positions=True)
+        assert len(simulation.position_universes[0].residues) == 1094
+
     def test_sets_up_position_universes_for_pimd(self):
         path = "./files/bulk_water/quantum"
         pimd_simulation = analysis.Simulation(path)
