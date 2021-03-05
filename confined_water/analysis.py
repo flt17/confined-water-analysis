@@ -1291,6 +1291,7 @@ class Simulation:
         start_time: int = None,
         end_time: int = None,
         frame_frequency: int = None,
+        frame_frequency_surface: int = None,
     ):
         """
         Compute mean friction coefficient lambda via green kubo relation from summed force autocorrelation.
@@ -1301,6 +1302,7 @@ class Simulation:
             start_time (int) : Start time for analysis (optional).
             end_time (int) : End time for analysis (optional).
             frame_frequency (int): Take every nth frame only (optional).
+            frame_frequency_surface (int): Take every mth frame only for calculation of radius of tube.
         Returns:
         """
 
@@ -1425,7 +1427,7 @@ class Simulation:
         # IMPORTANT: the friction coefficient lambda will be expressed in N s/m^3
         # first: compute surface area of solid phase:
         surface_area_solid = self._get_surface_area_of_solid_phase(
-            direction_index, start_time, end_time, frame_frequency
+            direction_index, start_time, end_time, frame_frequency_surface
         )
         # Compute prefactor for unit conversion
         prefactor = (
