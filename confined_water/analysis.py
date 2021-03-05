@@ -1424,7 +1424,9 @@ class Simulation:
         # compute friction from obtained autocorrelation of summed forces by integrating over autcorrelation function
         # IMPORTANT: the friction coefficient lambda will be expressed in N s/m^3
         # first: compute surface area of solid phase:
-        surface_area_solid = self._get_surface_area_of_solid_phase(direction_index)
+        surface_area_solid = self._get_surface_area_of_solid_phase(
+            direction_index, start_time, end_time, frame_frequency
+        )
         # Compute prefactor for unit conversion
         prefactor = (
             (global_variables.EV_TO_JOULE / global_variables.ANGSTROM_TO_METER) ** 2
