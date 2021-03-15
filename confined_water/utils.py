@@ -101,7 +101,10 @@ def get_ase_atoms_object(pdb_file_path: str):
 
 
 def get_mdanalysis_universe(
-    directory_path: str, universe_type: str = "positions", topology_file_prefix: str = None
+    directory_path: str,
+    universe_type: str = "positions",
+    topology_file_prefix: str = None,
+    trajectory_format="dcd",
 ):
     """
     Return an mdanalysis universe object based on a given trajectory. This will be done by
@@ -113,6 +116,7 @@ def get_mdanalysis_universe(
                              be created. So far, only positions are implemented as the velocity and
                              force-dcd files need to be converted.
         topology_file_prefix (str): General name of pdb file. Only exact matching implemented here.
+        trajectory_format (str) : File format of trajectory, default is dcd.
 
     Returns:
         mdanalysis_universe (object): The mdanalsysis universe object(s) dependent on the number of
@@ -137,7 +141,9 @@ def get_mdanalysis_universe(
         )
 
     # Look for trajectory (dcd) files , could be more than one if PIMD was performed
-    trajectory_files = get_path_to_file(directory_path, "dcd", trajectory_prefix, exact_match=False)
+    trajectory_files = get_path_to_file(
+        directory_path, trajectory_format, trajectory_prefix, exact_match=False
+    )
 
     print(f"Creating universes for {len(trajectory_files)} trajectories.")
 

@@ -200,6 +200,7 @@ class Simulation:
         read_velocities: bool = False,
         read_summed_forces: bool = False,
         topology_file_name: str = None,
+        trajectory_format: str = "dcd",
     ):
 
         """
@@ -209,6 +210,7 @@ class Simulation:
             read_velocities (bool) : Whether to read in velocity trajectories.
             read_summed_forces (bool) : Whether to read in separately printed summed forces.
             topology_file_name (str) : Name of the topology file (currently only pdb). If not given, first file taken.
+            trajectory_format (str) : File format of trajectory, default is dcd.
 
         Returns:
 
@@ -223,7 +225,7 @@ class Simulation:
         # Functions which compute a specific property will choose which universe is picked in case of PIMD.
         if read_positions:
             universes = utils.get_mdanalysis_universe(
-                self.directory_path, "positions", topology_file_name
+                self.directory_path, "positions", topology_file_name, trajectory_format
             )
 
             # to make sure self.position_universes is always a list of MDAnalysis Universes
@@ -237,7 +239,7 @@ class Simulation:
         # Functions which compute a specific property will choose which universe is picked in case of PIMD.
         if read_velocities:
             universes = utils.get_mdanalysis_universe(
-                self.directory_path, "velocities", topology_file_name
+                self.directory_path, "velocities", topology_file_name, trajectory_format
             )
 
             # to make sure self.position_universes is always a list of MDAnalysis Universes
