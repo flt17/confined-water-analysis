@@ -113,12 +113,16 @@ class Simulation:
 
         # start with doing the solid
 
-        solid_atoms = self.position_universes[0].select_atoms("name B N Na Cl C")
+        solid_atoms = self.position_universes[0].select_atoms("not name O H")
 
         # all solids as one residuum for each universe
         for count_universe, universe in enumerate(self.position_universes):
 
+            solid_segment = universe.add_Segment(segid=0, segname="Solid", segnum=0)
+            liquid_segment = universe.add_Segment(segid=1, segname="Liquid", segnum=0)
+
             solid_residuum = universe.add_Residue(
+                segment=solid_segment,
                 resid=0,
                 resname="Solid",
                 resnum=0,
@@ -131,7 +135,11 @@ class Simulation:
         if hasattr(self, "velocity_universes"):
             for count_universe, universe in enumerate(self.velocity_universes):
 
+                solid_segment = universe.add_Segment(segid=0, segname="Solid", segnum=0)
+                liquid_segment = universe.add_Segment(segid=1, segname="Liquid", segnum=0)
+
                 solid_residuum = universe.add_Residue(
+                    segment=solid_segment,
                     resid=0,
                     resname="Solid",
                     resnum=0,
@@ -173,6 +181,7 @@ class Simulation:
 
                 # define residuum for each oxygen/water
                 current_residuum = universe.add_Residue(
+                    segment=liquid_segment,
                     resid=count_oxygen + 1,
                     resname=f"W{count_oxygen+1}",
                     resnum=count_oxygen + 1,
@@ -186,6 +195,7 @@ class Simulation:
                 for count_universe, universe in enumerate(self.velocity_universes):
 
                     current_residuum = universe.add_Residue(
+                        segment=liquid_segment,
                         resid=count_oxygen,
                         resname=f"W{count_oxygen+1}",
                         resnum=count_oxygen,
