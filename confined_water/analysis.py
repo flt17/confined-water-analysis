@@ -1568,7 +1568,7 @@ class Simulation:
 
             radii_universe = []
             # determine solid atoms, so far only B N C supported
-            solid_atoms = universe.select_atoms(f"name B N C")
+            solid_atoms = universe.select_atoms(f"not name O H")
 
             # Loop over trajectory, as the radius should converge quickly we take only every 10th frame in comparison
             # to the global settings

@@ -345,7 +345,7 @@ def compute_spatial_distribution_of_atoms_on_interface(
     solid_reshaped = solid.reshape(number_of_samples, -1, 2)
 
     # re-define solid atoms once more (could be done better)
-    solid_atoms = position_universe.select_atoms("name B N C Na Cl")
+    solid_atoms = position_universe.select_atoms("not name O H")
 
     # define dictionary
     dict_solid_per_element = {}
@@ -398,7 +398,7 @@ def _compute_distribution_for_system_with_one_periodic_direction(
     # universe.atoms.pack_into_box(box=topology.get_cell_lengths_and_angles(), inplace=True)
 
     # start by separating solid atoms from liquid atoms
-    solid_atoms = universe.select_atoms("name B N C Na Cl")
+    solid_atoms = universe.select_atoms("not name O H")
     liquid_atoms = universe.select_atoms("name O H")
 
     # this will serve as our anchor for translation for computing the free energy profile
@@ -583,7 +583,7 @@ def _compute_distribution_for_system_with_two_periodic_directions(
     # universe.atoms.pack_into_box(box=topology.get_cell_lengths_and_angles(), inplace=True)
 
     # start by separating solid atoms from liquid atoms
-    solid_atoms = universe.select_atoms("name B N C Na Cl")
+    solid_atoms = universe.select_atoms("not name O H")
 
     # approximate water with oxygens here
     liquid_atoms = universe.select_atoms("name O")
