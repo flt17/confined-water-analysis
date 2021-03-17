@@ -615,15 +615,15 @@ class Simulation:
         """
 
         # determine reference atoms, here only solid atoms (B,N,C) allowed
-        reference_species = ["B", "N", "C", "Cl", "Na"]
-        reference_species_string = " ".join(reference_species)
+        # reference_species = ["B", "N", "C", "Cl", "Na"]
+        # reference_species_string = " ".join(reference_species)
 
-        if not set(self.species_in_system).intersection(reference_species):
-            raise KeyNotFound(
-                f"Couldn't find a solid phase in this trajectory. Currently only {reference_species_string} are implemented."
-            )
+        # if not set(self.species_in_system).intersection(reference_species):
+        #     raise KeyNotFound(
+        #         f"Couldn't find a solid phase in this trajectory. Currently only {reference_species_string} are implemented."
+        #     )
 
-        reference_atoms = position_universe.select_atoms(f"name {reference_species_string}")
+        reference_atoms = position_universe.select_atoms("not name O H")
 
         # define range and bin width for histogram binning
         # bin range is simply the box length in the given direction
