@@ -354,7 +354,7 @@ def compute_spatial_distribution_of_atoms_on_interface(
     for element in solid_types:
 
         # get indices
-        indices_for_element = np.where(solid_atoms.types == element)
+        indices_for_element = np.where(solid_atoms.names == element)
 
         # positions of element
         positions_for_element = solid_reshaped[:, indices_for_element].reshape(-1, 2)
