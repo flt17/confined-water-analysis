@@ -309,7 +309,7 @@ def compute_spatial_distribution_of_atoms_on_interface(
     """
 
     # get all atom types which are not water:
-    solid_types = list(set(np.unique(position_universe.atoms.types)) ^ set(["O", "H"]))
+    solid_types = list(set(np.unique(position_universe.atoms.names)) ^ set(["O", "H"]))
 
     # define how many samples will be taken
     number_of_samples = np.arange(start_frame, end_frame, frame_frequency).shape[0]
