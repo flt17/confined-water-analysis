@@ -342,7 +342,7 @@ def compute_spatial_distribution_of_atoms_on_interface(
 
     # before returning distribution assign solid positions to types
     # start by reshaping solid
-    solid_reshaped = solid.reshape(number_of_samples, -1, 2)
+    solid_reshaped = solid.reshape(number_of_samples, -1, 3)
 
     # re-define solid atoms once more (could be done better)
     solid_atoms = position_universe.select_atoms("not name O H")
@@ -640,7 +640,7 @@ def _compute_distribution_for_system_with_two_periodic_directions(
         )
 
         # save solid
-        solid_all = np.append(solid_all, solid_atoms.positions[:, [0, 1, 2]])
+        solid_all = np.append(solid_all, solid_atoms.positions)
 
         # making code more efficient, ugly but useful
         if count_frames % 1000 == 0 or count_frames == number_of_samples - 1:
