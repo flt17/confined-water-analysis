@@ -640,7 +640,7 @@ def _compute_distribution_for_system_with_two_periodic_directions(
         )
 
         # save solid
-        solid_all = np.append(solid_all, solid_atoms.positions[:, pbc_indices])
+        solid_all = np.append(solid_all, solid_atoms.positions)
 
         # making code more efficient, ugly but useful
         if count_frames % 1000 == 0 or count_frames == number_of_samples - 1:
