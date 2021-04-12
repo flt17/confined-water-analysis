@@ -222,12 +222,12 @@ class Simulation:
             # Loop over all position universes
             for count_universe, universe in enumerate(self.position_universes):
 
-                universe.atoms[np.where(universe[0].atoms.names == element)].masses = mass
+                universe.atoms[np.where(universe.atoms.names == element)].masses = mass
 
             # check if we need to do the same thing for velocities
             if hasattr(self, "velocity_universes"):
                 for count_universe, universe in enumerate(self.velocity_universes):
-                    universe.atoms[np.where(universe[0].atoms.names == element)].masses = mass
+                    universe.atoms[np.where(universe.atoms.names == element)].masses = mass
 
     def read_in_simulation_data(
         self,
