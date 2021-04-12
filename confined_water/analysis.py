@@ -204,6 +204,31 @@ class Simulation:
 
                     universe.atoms[atom_indices_water].residues = current_residuum
 
+    def set_atomic_masses(self, element_mass_dictionary):
+        """
+        Sets the atomic mass for species given.
+        Arguments:
+            element_mass_dictionary (dictionary): Dictionary with masses for each element that should be adjusted.
+        Returns:
+        """
+
+        # check if all species are a subset of species in system
+        if not set(element_mass_dictionary.keys()).issubset(self.species_in_system):
+            raise KeyNotFound(f"At least on of the species specified is not in the system.")
+
+        # Loop over all entries of dictionary
+        for element, mass in element_mass_dictionary.items():
+
+            # Loop over all position universes
+            for count_universe, universe in enumerate(self.position_universes):
+
+                universe.atoms[np.where(universe[0].atoms.names == element)].masses = mass
+
+            # check if we need to do the same thing for velocities
+            if hasattr(self, "velocity_universes"):
+                for count_universe, universe in enumerate(self.velocity_universes):
+                    universe.atoms[np.where(universe[0].atoms.names == element)].masses = mass
+
     def read_in_simulation_data(
         self,
         read_positions: bool = True,
