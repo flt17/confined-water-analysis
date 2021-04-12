@@ -126,7 +126,7 @@ def get_mdanalysis_universe(
 
     # Link universe_type to file names of respective trajectories via dictionary
     # Currently, only supports default of CP2K
-    dictionary_trajectory_files = {"positions": "pos", "velocities": "vel", "forces": "frc"}
+    dictionary_trajectory_files = {"positions": "-pos-", "velocities": "-vel-", "forces": "-frc-"}
 
     # Look for topology file (only pdb supported) in same directory, only exact matching implemented for prefix
     topology_file = get_path_to_file(directory_path, "pdb", topology_file_prefix)
