@@ -524,6 +524,7 @@ class Simulation:
         start_time: int = None,
         end_time: int = None,
         frame_frequency: int = None,
+        bin_width: float = 0.1,
     ):
         """
         Compute density profile either radially or in a given direction
@@ -534,6 +535,7 @@ class Simulation:
             start_time (int) : Start time for analysis (optional).
             end_time (int) : End time for analysis (optional).
             frame_frequency (int): Take every nth frame only (optional).
+            bin_width (flat) : Bin width for density profile in angstrom (optional).
         Returns:
 
         """
@@ -587,6 +589,7 @@ class Simulation:
                     start_frame,
                     end_frame,
                     frame_frequency,
+                    bin_width,
                 )
             else:
                 (
@@ -599,6 +602,7 @@ class Simulation:
                     start_frame,
                     end_frame,
                     frame_frequency,
+                    bin_width,
                 )
 
             density_profiles_sampled.append(density_profile)
@@ -622,6 +626,7 @@ class Simulation:
         start_frame: int,
         end_frame: int,
         frame_frequency: int,
+        bin_width: float = 0.1,
     ):
         """
         Compute density profile in a given direction along cartesian axis.
@@ -633,6 +638,7 @@ class Simulation:
             start_frame (int) : Start frame for analysis.
             end_frame (int) : End frame for analysis.
             frame_frequency (int): Take every nth frame only.
+            bin_width (flat) : Bin width for density profile in angstrom.
         Returns:
             bins_histogram (np.array): Bins of the histogram of the density profile.
             density_profile (np.asarray) : Density profile based on the bins.
@@ -654,8 +660,8 @@ class Simulation:
         # bin range is simply the box length in the given direction
         bin_range = self.topology.get_cell_lengths_and_angles()[direction]
         # for now, bin width is set to a default value of 0.1 angstroms
-        bin_width = 0.1
-        bins_histogram = np.arange(0, bin_range, bin_width)
+        bin_width = bin_width
+        bins_histogram = np.arange(-bin_range, bin_range, bin_width)
 
         # initialise mass profile array
         mass_profile = np.zeros(bins_histogram.shape[0])
@@ -713,6 +719,7 @@ class Simulation:
         start_frame: int,
         end_frame: int,
         frame_frequency: int,
+        bin_width: float = 0.1,
     ):
         """
         Compute density profile in radial direction around
@@ -724,6 +731,7 @@ class Simulation:
             start_frame (int) : Start frame for analysis.
             end_frame (int) : End frame for analysis.
             frame_frequency (int): Take every nth frame only.
+            bin_width (flat) : Bin width for density profile in angstrom.
         Returns:
             bins_histogram (np.array): Bins of the histogram of the density profile.
                                       Note that the bins are based on the center of np.digitize.
@@ -734,7 +742,7 @@ class Simulation:
         # bin range is simply the half box length along axis orthogonal to direction (squared area)
         bin_range = self.topology.get_cell_lengths_and_angles()[0:3][direction - 1] * 0.5
         # for now, bin width is set to a default value of 0.1 angstroms
-        bin_width = 0.1
+        bin_width = bin_width
         bins_histogram = np.arange(0, bin_range, bin_width)
 
         # initialise mass profile array
