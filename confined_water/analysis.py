@@ -517,6 +517,30 @@ class Simulation:
 
         self.radial_distribution_functions[name_based_on_species] = [calc.bins, averaged_rdf]
 
+    def compute_water_orientation_profile(
+        self,
+        start_time: int = None,
+        end_time: int = None,
+        frame_frequency: int = None,
+        bin_width: float = 0.1,
+    ):
+        """
+        Compute orientation of water molecules in nanotube or on interface, direction will be taken from pbc indices.
+        Arguments:
+
+            start_time (int) : Start time for analysis (optional).
+            end_time (int) : End time for analysis (optional).
+            frame_frequency (int): Take every nth frame only (optional).
+            bin_width (flat) : Bin width for angle profile (optional).
+        Returns:
+
+        """
+
+        # get information about sampling either from given arguments or previously set
+        start_frame, end_frame, frame_frequency = self._get_sampling_frames(
+            start_time, end_time, frame_frequency
+        )
+
     def compute_density_profile(
         self,
         species: list,
