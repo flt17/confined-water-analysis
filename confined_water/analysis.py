@@ -592,7 +592,6 @@ class Simulation:
             start_frame (int) : Start frame for analysis.
             end_frame (int) : End frame for analysis.
             frame_frequency (int): Take every nth frame only.
-            bin_width (flat) : Bin width for density profile in angstrom.
         Returns:
             orientations (np.asarray) : Water orientations in the system.
 
@@ -635,6 +634,77 @@ class Simulation:
 
         return orientations
 
+    def _compute_water_orientation_profile_in_radial_direction(
+        self,
+        position_universe,
+        start_frame: int,
+        end_frame: int,
+        frame_frequency: int,
+    ):
+        """
+        Compute water orientation profile along radially along periodic cartesian axis.
+        Arguments:
+            position_universe : MDAnalysis universe with trajectory.
+            start_frame (int) : Start frame for analysis.
+            end_frame (int) : End frame for analysis.
+            frame_frequency (int): Take every nth frame only.
+        Returns:
+            orientations (np.asarray) : Water orientations in the system.
+
+        """
+
+        # get number of water molecules:
+        oxygen_atoms = position_universe.select_atoms("name O")
+        number_of_water_molecules = len(oxygen_atoms)
+
+        # get vector parallel to axis for which we analyse the orientation
+        # based on pbc check what direction is investigated
+        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(self.pbc_dimensions)
+        not_pbc_indices = list(set(pbc_dimensions_indices) ^ set([0, 1, 2]))
+
+        # initialise mass profile array
+        number_of_frames = len(
+            position_universe.trajectory[start_frame:end_frame][::frame_frequency]
+        )
+        orientations = np.zeros((number_of_water_molecules, number_of_frames))
+        # Loop over trajectory
+        for count_frames, frames in enumerate(
+            tqdm((position_universe.trajectory[start_frame:end_frame])[::frame_frequency])
+        ):
+            # compute dipole vector for each water molecule
+            dipole_moment_vector_all_water = np.asarray(
+                [
+                    utils.get_dipole_moment_vector_in_water_molecule(
+                        position_universe.select_atoms(f"resname W{water_index+1}"),
+                        self.topology,
+                        self.pbc_dimensions,
+                    )
+                    for water_index in np.arange(number_of_water_molecules)
+                ]
+            )
+
+            # compute reference coordinate, i.e. center of mass of all atoms
+            system_center_of_mass = np.ma.array(position_universe.atoms.center_of_mass())
+            system_center_of_mass[pbc_dimensions_indices] = np.ma.masked
+            reference_coordinates = system_center_of_mass.compressed()
+
+            # compute radial distance from oxygen to reference
+            vectors_2D_oxygens_to_COM = (
+                reference_coordinates - oxygen_atoms.positions[:, not_pbc_indices]
+            )
+            # orientation angle is expressed in cos theta
+            orientations[:, count_frames] = (
+                np.einsum(
+                    "ij,ij->i",
+                    dipole_moment_vector_all_water[:, not_pbc_indices],
+                    vectors_2D_oxygens_to_COM,
+                )
+                / np.linalg.norm(dipole_moment_vector_all_water[:, not_pbc_indices], axis=1)
+                / np.linalg.norm(vectors_2D_oxygens_to_COM)
+            )
+
+        return orientations
+
     def compute_density_profile(
         self,
         species: list,
@@ -660,7 +730,6 @@ class Simulation:
 
         # check in which direction/orientation density profile should be calculated
         dictionary_direction = {"x": 0, "y": 1, "z": 2, "radial x": 0, "radial y": 1, "radial z": 2}
-
         direction_index = dictionary_direction.get(direction)
         if not direction_index:
             raise KeyNotFound(
@@ -767,12 +836,10 @@ class Simulation:
         # reference_species = ["B", "N", "C", "Cl", "Na"]
         # reference_species_string = " ".join(reference_species)
 
-        # if not set(self.species_in_system).intersection(reference_species):
-        #     raise KeyNotFound(
-        #         f"Couldn't find a solid phase in this trajectory. Currently only {reference_species_string} are implemented."
-        #     )
-
         reference_atoms = position_universe.select_atoms("not name O H")
+
+        if len(reference_atoms) == 0:
+            raise KeyNotFound(f"Couldn't find a solid phase in this trajectory.")
 
         # define range and bin width for histogram binning
         # bin range is simply the box length in the given direction

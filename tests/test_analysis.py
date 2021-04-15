@@ -168,6 +168,26 @@ class TestSimulation_ComputeWaterOrientationProfileAlongCartesianAxis:
         )
 
 
+class TestSimulation_ComputeWaterOrientationInRadialDirection:
+    def test_returns_profile_in_radial_direction(self):
+        path = "./files/water_in_carbon_nanotube/m12_n12/classical"
+
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True)
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+        simulation.set_pbc_dimensions("z")
+
+        simulation.compute_water_orientation_profile(frame_frequency=10)
+
+        assert (
+            np.max(simulation.water_orientations[0]) <= 1
+            and np.min(simulation.water_orientations[0]) >= -1
+        )
+
+
 class TestSimulation_ComputeDensityProfileAlongCartesianAxis:
     def test_raises_error_when_no_solid_is_found(self):
         path = "./files/bulk_water/classical"

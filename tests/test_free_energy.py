@@ -28,7 +28,6 @@ class TestComputeAtomicProbabilities:
             simulation.pbc_dimensions
         )
         tube_radius = simulation.compute_tube_radius(pbc_dimensions_indices)
-
         free_energy.compute_spatial_distribution_of_atoms_on_interface(
             simulation.position_universes[0],
             simulation.topology,

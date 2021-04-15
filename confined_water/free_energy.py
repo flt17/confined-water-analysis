@@ -328,6 +328,8 @@ def compute_spatial_distribution_of_atoms_on_interface(
             frame_frequency,
         )
 
+        n_coords = 2
+
     else:
         # compute probabilities for flat interface
         liquid, solid = _compute_distribution_for_system_with_two_periodic_directions(
@@ -340,9 +342,11 @@ def compute_spatial_distribution_of_atoms_on_interface(
             frame_frequency,
         )
 
+        n_coords = 3
+
     # before returning distribution assign solid positions to types
     # start by reshaping solid
-    solid_reshaped = solid.reshape(number_of_samples, -1, 3)
+    solid_reshaped = solid.reshape(number_of_samples, -1, n_coords)
 
     # re-define solid atoms once more (could be done better)
     solid_atoms = position_universe.select_atoms("not name O H")
@@ -357,7 +361,7 @@ def compute_spatial_distribution_of_atoms_on_interface(
         indices_for_element = np.where(solid_atoms.names == element)
 
         # positions of element
-        positions_for_element = solid_reshaped[:, indices_for_element].reshape(-1, 3)
+        positions_for_element = solid_reshaped[:, indices_for_element].reshape(-1, n_coords)
 
         dict_solid_per_element[element] = positions_for_element
 
