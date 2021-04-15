@@ -522,7 +522,6 @@ class Simulation:
         start_time: int = None,
         end_time: int = None,
         frame_frequency: int = None,
-        bin_width: float = 0.1,
     ):
         """
         Compute orientation of water molecules in nanotube or on interface, direction will be taken from pbc indices.
@@ -554,32 +553,30 @@ class Simulation:
             else self.position_universes[1::]
         )
 
+        orientations_sampled = []
+
         # Loop over all universes
         for count_universe, universe in enumerate(tmp_position_universes):
 
             # call function dependent on direction:
             if len(self.pbc_dimensions) == 2:
-                (
-                    bins_histogram,
-                    orientation_profile,
-                ) = self._compute_water_orientation_profile_along_cartesian_axis(
+                (orientations) = self._compute_water_orientation_profile_along_cartesian_axis(
                     universe,
                     start_frame,
                     end_frame,
                     frame_frequency,
-                    bin_width,
                 )
             else:
-                (
-                    bins_histogram,
-                    orientation_profile,
-                ) = self._compute_water_orientation_profile_in_radial_direction(
+                (orientations) = self._compute_water_orientation_profile_in_radial_direction(
                     universe,
                     start_frame,
                     end_frame,
                     frame_frequency,
-                    bin_width,
                 )
+
+            orientations_sampled.append(orientations)
+
+        self.water_orientations = orientations_sampled
 
     def _compute_water_orientation_profile_along_cartesian_axis(
         self,
@@ -587,7 +584,6 @@ class Simulation:
         start_frame: int,
         end_frame: int,
         frame_frequency: int,
-        bin_width: float = 0.1,
     ):
         """
         Compute water orientation profile along non-periodic cartesian axis.
@@ -598,8 +594,7 @@ class Simulation:
             frame_frequency (int): Take every nth frame only.
             bin_width (flat) : Bin width for density profile in angstrom.
         Returns:
-            bins_histogram (np.array): Bins of the histogram of the waterorientation profile.
-            orientation_profile (np.asarray) : Water orientation profile based on the bins.
+            orientations (np.asarray) : Water orientations in the system.
 
         """
 
@@ -607,19 +602,38 @@ class Simulation:
         water_atoms = position_universe.select_atoms("resname W*")
         number_of_water_molecules = int(len(water_atoms) / 3)
 
-        # set up everything for histogram
-        bin_width = bin_width
-        bins_histogram = np.arange(0, 180, bin_width)
+        # get vector parallel to axis for which we analyse the orientation
+        # based on pbc check what direction is investigated
+        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(self.pbc_dimensions)
+        not_pbc_indices = list(set(pbc_dimensions_indices) ^ set([0, 1, 2]))
 
         # initialise mass profile array
-        orientation_profile = np.zeros(bins_histogram.shape[0])
-
+        number_of_frames = len(
+            position_universe.trajectory[start_frame:end_frame][::frame_frequency]
+        )
+        orientations = np.zeros((number_of_water_molecules, number_of_frames))
         # Loop over trajectory
         for count_frames, frames in enumerate(
             tqdm((position_universe.trajectory[start_frame:end_frame])[::frame_frequency])
         ):
             # compute dipole vector for each water molecule
-            pass
+            dipole_moment_vector_all_water = np.asarray(
+                [
+                    utils.get_dipole_moment_vector_in_water_molecule(
+                        water_atoms.select_atoms(f"resname W{water_index+1}"),
+                        self.topology,
+                        self.pbc_dimensions,
+                    )
+                    for water_index in np.arange(number_of_water_molecules)
+                ]
+            )
+
+            # orientation angle is expressed in cos theta
+            orientations[:, count_frames] = dipole_moment_vector_all_water[
+                :, not_pbc_indices[0]
+            ] / np.linalg.norm(dipole_moment_vector_all_water, axis=1)
+
+        return orientations
 
     def compute_density_profile(
         self,

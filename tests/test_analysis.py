@@ -160,7 +160,12 @@ class TestSimulation_ComputeWaterOrientationProfileAlongCartesianAxis:
         )
         simulation.set_pbc_dimensions("xy")
 
-        # simulation.compute_water_orientation_profile()
+        simulation.compute_water_orientation_profile(frame_frequency=10)
+
+        assert (
+            np.max(simulation.water_orientations[0]) <= 1
+            and np.min(simulation.water_orientations[0]) >= -1
+        )
 
 
 class TestSimulation_ComputeDensityProfileAlongCartesianAxis:
