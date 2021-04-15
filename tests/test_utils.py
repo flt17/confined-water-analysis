@@ -260,4 +260,32 @@ class TestApplyMinimumImageConventionToInteratomicVectors:
 
             assert correction
 
-            # assert
+    class TestGetDipoleMomentVectorInWaterMolecule:
+        def test_returns_vectors_for_all_waters_in_bulk(self):
+
+            path = "./files/bulk_water/classical"
+
+            topology_name = "revPBE0-D3-w64-T300K-1bar"
+            simulation = analysis.Simulation(path)
+
+            simulation.read_in_simulation_data(
+                read_positions=True, topology_file_name=topology_name
+            )
+
+            simulation.set_pbc_dimensions("xyz")
+
+            number_of_water_molecules = len(simulation.position_universes[0].select_atoms("name O"))
+
+            dipole_moment_vectors = []
+            for water_index in np.arange(number_of_water_molecules):
+                water_atoms = simulation.position_universes[0].select_atoms(
+                    f"resname W{water_index+1}"
+                )
+
+                dipole_moment_vectors.append(
+                    utils.get_dipole_moment_vector_in_water_molecule(
+                        water_atoms, simulation.topology, simulation.pbc_dimensions
+                    )
+                )
+
+            assert np.max(np.linalg.norm(np.asarray(dipole_moment_vectors), axis=1)) < 1

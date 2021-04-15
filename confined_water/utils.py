@@ -207,7 +207,7 @@ def apply_minimum_image_convention_to_interatomic_vectors(
     return vectors_MIC
 
 
-def _get_dipole_moment_vector_in_water_molecule(atom_group, topology, dimension: str = "xyz"):
+def get_dipole_moment_vector_in_water_molecule(atom_group, topology, dimension: str = "xyz"):
 
     """
     Return dipole moment vector from oxygen atom to COM of hydrogen atoms of given atom group.
@@ -218,8 +218,15 @@ def _get_dipole_moment_vector_in_water_molecule(atom_group, topology, dimension:
     Returns:
         dipole_moment_vector (np.array): Dipole moment water vector in accordance with pbc.
     """
+    # compute center of mass of hydrogen atoms
+    COM_hydrogen_atoms = get_center_of_mass_of_atoms_in_accordance_with_MIC(
+        atom_group.select_atoms("name H"), topology, dimension
+    )
 
-    pass
+    # now return dipole vector
+    return apply_minimum_image_convention_to_interatomic_vectors(
+        COM_hydrogen_atoms - atom_group.select_atoms("name O").positions, topology.cell, dimension
+    ).flatten()
 
 
 def get_center_of_mass_of_atoms_in_accordance_with_MIC(
