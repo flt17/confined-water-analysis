@@ -597,6 +597,8 @@ class Simulation:
 
         """
 
+        reference_atoms = position_universe.select_atoms("not name O H")
+
         # get number of water molecules:
         oxygen_atoms = position_universe.select_atoms("name O")
         number_of_water_molecules = len(oxygen_atoms)
@@ -633,7 +635,10 @@ class Simulation:
                 :, not_pbc_indices[0]
             ] / np.linalg.norm(dipole_moment_vector_all_water, axis=1)
 
-            heights[:, count_frames] = oxygen_atoms.positions[:, not_pbc_indices[0]]
+            heights[:, count_frames] = (
+                oxygen_atoms.positions[:, not_pbc_indices[0]]
+                - reference_atoms.center_of_mass()[not_pbc_indices[0]]
+            )
 
         orientations_over_heights = np.vstack((orientations.flatten(), heights.flatten())).T
         return orientations_over_heights
