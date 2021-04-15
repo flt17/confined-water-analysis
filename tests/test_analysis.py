@@ -163,8 +163,8 @@ class TestSimulation_ComputeWaterOrientationProfileAlongCartesianAxis:
         simulation.compute_water_orientation_profile(frame_frequency=10)
 
         assert (
-            np.max(simulation.water_orientations[0]) <= 1
-            and np.min(simulation.water_orientations[0]) >= -1
+            np.max(simulation.water_orientations_spatially_resolved[0][:, 0]) <= 1
+            and np.min(simulation.water_orientations_spatially_resolved[0][:, 0]) >= -1
         )
 
 
@@ -183,8 +183,8 @@ class TestSimulation_ComputeWaterOrientationInRadialDirection:
         simulation.compute_water_orientation_profile(frame_frequency=10)
 
         assert (
-            np.max(simulation.water_orientations[0]) <= 1
-            and np.min(simulation.water_orientations[0]) >= -1
+            np.max(simulation.water_orientations_spatially_resolved[0][:, 0]) <= 1
+            and np.min(simulation.water_orientations_spatially_resolved[0][:, 0]) >= -1
         )
 
 
