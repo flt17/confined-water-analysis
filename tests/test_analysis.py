@@ -148,6 +148,21 @@ class TestSimulationComputeDensityProfile:
             simulation.compute_density_profile(["O", "H"], direction="w")
 
 
+class TestSimulation_ComputeWaterOrientationProfileAlongCartesianAxis:
+    def test_returns_profile_in_z_direction(self):
+        path = "./files/water_on_graphene"
+
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True)
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+        simulation.set_pbc_dimensions("xy")
+
+        # simulation.compute_water_orientation_profile()
+
+
 class TestSimulation_ComputeDensityProfileAlongCartesianAxis:
     def test_raises_error_when_no_solid_is_found(self):
         path = "./files/bulk_water/classical"

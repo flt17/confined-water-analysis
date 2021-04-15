@@ -535,11 +535,91 @@ class Simulation:
         Returns:
 
         """
+        # water orientation only doable for confined water system, not bulk
+        if len(self.pbc_dimensions) == 3:
+            raise UnphysicalValue(
+                "Why would you want to calculate the angular distribution in bulk water?"
+            )
 
         # get information about sampling either from given arguments or previously set
         start_frame, end_frame, frame_frequency = self._get_sampling_frames(
             start_time, end_time, frame_frequency
         )
+
+        # determine which position universe are to be used in case of PIMD
+        # Thermodynamic properties are based on trajectory of replica
+        tmp_position_universes = (
+            self.position_universes
+            if len(self.position_universes) == 1
+            else self.position_universes[1::]
+        )
+
+        # Loop over all universes
+        for count_universe, universe in enumerate(tmp_position_universes):
+
+            # call function dependent on direction:
+            if len(self.pbc_dimensions) == 2:
+                (
+                    bins_histogram,
+                    orientation_profile,
+                ) = self._compute_water_orientation_profile_along_cartesian_axis(
+                    universe,
+                    start_frame,
+                    end_frame,
+                    frame_frequency,
+                    bin_width,
+                )
+            else:
+                (
+                    bins_histogram,
+                    orientation_profile,
+                ) = self._compute_water_orientation_profile_in_radial_direction(
+                    universe,
+                    start_frame,
+                    end_frame,
+                    frame_frequency,
+                    bin_width,
+                )
+
+    def _compute_water_orientation_profile_along_cartesian_axis(
+        self,
+        position_universe,
+        start_frame: int,
+        end_frame: int,
+        frame_frequency: int,
+        bin_width: float = 0.1,
+    ):
+        """
+        Compute water orientation profile along non-periodic cartesian axis.
+        Arguments:
+            position_universe : MDAnalysis universe with trajectory.
+            start_frame (int) : Start frame for analysis.
+            end_frame (int) : End frame for analysis.
+            frame_frequency (int): Take every nth frame only.
+            bin_width (flat) : Bin width for density profile in angstrom.
+        Returns:
+            bins_histogram (np.array): Bins of the histogram of the waterorientation profile.
+            orientation_profile (np.asarray) : Water orientation profile based on the bins.
+
+        """
+
+        # get number of water molecules:
+        water_atoms = position_universe.select_atoms("resname W*")
+        number_of_water_molecules = int(len(water_atoms) / 3)
+
+        # set up everything for histogram
+        bin_width = bin_width
+        bins_histogram = np.arange(0, 180, bin_width)
+
+        # initialise mass profile array
+        orientation_profile = np.zeros(bins_histogram.shape[0])
+
+        # Loop over trajectory
+        for count_frames, frames in enumerate(
+            tqdm((position_universe.trajectory[start_frame:end_frame])[::frame_frequency])
+        ):
+            # compute dipole vector for each water molecule
+            pass
 
     def compute_density_profile(
         self,
