@@ -693,6 +693,7 @@ class Simulation:
                 reference_coordinates - oxygen_atoms.positions[:, not_pbc_indices]
             )
             # orientation angle is expressed in cos theta
+
             orientations[:, count_frames] = (
                 np.einsum(
                     "ij,ij->i",
@@ -700,7 +701,7 @@ class Simulation:
                     vectors_2D_oxygens_to_COM,
                 )
                 / np.linalg.norm(dipole_moment_vector_all_water[:, not_pbc_indices], axis=1)
-                / np.linalg.norm(vectors_2D_oxygens_to_COM)
+                / np.linalg.norm(vectors_2D_oxygens_to_COM, axis=1)
             )
 
         return orientations
