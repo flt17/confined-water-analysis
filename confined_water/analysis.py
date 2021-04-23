@@ -112,7 +112,6 @@ class Simulation:
         """
 
         # start with doing the solid
-
         solid_atoms = self.position_universes[0].select_atoms("not name O H")
 
         # all solids as one residuum for each universe
@@ -490,6 +489,8 @@ class Simulation:
         # loop over all universes
 
         for count_universe, universe in enumerate(tmp_position_universes):
+            # rewind trajectory
+            universe.trajectory[0]
 
             # determine MDAnalysis atom groups based on strings for the species provided
             atom_group_1 = universe.select_atoms(f"name {species_1}")
@@ -557,6 +558,9 @@ class Simulation:
 
         # Loop over all universes
         for count_universe, universe in enumerate(tmp_position_universes):
+
+            # rewind trajectory
+            universe.trajectory[0]
 
             # call function dependent on direction:
             if len(self.pbc_dimensions) == 2:
@@ -777,6 +781,9 @@ class Simulation:
 
         # Loop over all universes
         for count_universe, universe in enumerate(tmp_position_universes):
+
+            # rewind trajectory
+            universe.trajectory[0]
 
             # select atoms according to species
             atoms_selected = universe.select_atoms(f"name {selected_species_string}")
@@ -1048,6 +1055,9 @@ class Simulation:
         # Loop over all universes
         for count_universe, universe in enumerate(tmp_position_universes):
 
+            # rewind trajectory
+            universe.trajectory[0]
+
             # create instance of hydrogen_bonding.HydrogenBonding
             hydrogen_bonding_analysis = hydrogen_bonding.HydrogenBonding(universe, self.topology)
 
@@ -1153,6 +1163,9 @@ class Simulation:
                 f"samples per block ({number_of_samples_per_block}) < correlation frames {number_of_correlation_frames}.",
                 f"Please reduce the number of blocks or run longer trajectories.",
             )
+
+        # rewind trajectory
+        tmp_position_universe.trajectory[0]
 
         # Loop over trajectory to sample all positions of selected atoms
         for count_frames, frames in enumerate(
@@ -1338,6 +1351,9 @@ class Simulation:
         # determine which velocity universes are to be used in case of PIMD
         # Dynamical properties are based on trajectory of centroid!
         tmp_velocity_universe = self.velocity_universes[0]
+
+        # rewind trajectory
+        tmp_velocity_universe.trajectory[0]
 
         # check if correlation time can be obtained with current trajectory:
         number_of_samples = int((end_frame - start_frame) / frame_frequency)
@@ -1800,7 +1816,8 @@ class Simulation:
         radii_sampled = []
 
         for count_universe, universe in enumerate(tmp_position_universes):
-
+            # rewind trajectory
+            universe.trajectory[0]
             radii_universe = []
             # determine solid atoms, so far only B N C supported
             solid_atoms = universe.select_atoms(f"not name O H")
@@ -1973,6 +1990,9 @@ class Simulation:
 
         # loop over all universes
         for count_universe, universe in enumerate(tmp_position_universes):
+
+            # rewind trajectory
+            universe.trajectory[0]
 
             # compute probability of water molecules and solid atoms
             (

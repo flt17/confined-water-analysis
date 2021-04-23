@@ -60,6 +60,9 @@ class HydrogenBonding:
 
         """
 
+        # rewind trajectory
+        self.position_universe.trajectory[0]
+
         # Select atoms relevant for HB bonding
         # Here, this is limited to O and H
         oxygen_atoms = self.position_universe.select_atoms("name O")

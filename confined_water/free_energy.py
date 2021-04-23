@@ -401,6 +401,9 @@ def _compute_distribution_for_system_with_one_periodic_direction(
     # wrap atoms in box
     # universe.atoms.pack_into_box(box=topology.get_cell_lengths_and_angles(), inplace=True)
 
+    # rewind trajectory
+    universe.trajectory[0]
+
     # start by separating solid atoms from liquid atoms
     solid_atoms = universe.select_atoms("not name O H")
     liquid_atoms = universe.select_atoms("name O H")
@@ -582,6 +585,9 @@ def _compute_distribution_for_system_with_two_periodic_directions(
     not_pbc_indices = list(set(pbc_indices) ^ set([0, 1, 2]))
     periodic_vector = np.zeros(3)
     periodic_vector[pbc_indices] = 1
+
+    # rewind trajectory
+    universe.trajectory[0]
 
     # wrap atoms in box
     # universe.atoms.pack_into_box(box=topology.get_cell_lengths_and_angles(), inplace=True)
