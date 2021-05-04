@@ -1869,7 +1869,6 @@ class Simulation:
 
         not_pbc_dimensions = list(set(self.pbc_dimensions) ^ set("xyz"))
         not_pbc_indices = list(set(pbc_dimensions_indices) ^ set([0, 1, 2]))
-
         # if bulk, raise error
         if len(pbc_dimensions_indices) == 3:
             raise UnphysicalValue(
@@ -1908,8 +1907,13 @@ class Simulation:
 
             # we return now only the second minimum find expressed in the bins of the profile, i.e. in angstroms
             # the second minima is chosen instead of the first, as this is not zero and represents the "end" of
-            # the contact layer.
-            return self.density_profiles[string_density_dict][0][peak_indices[1]]
+            # the contact layer. To avoid ambiguity, we introduce a minimum density for which we accept the peak
+            # index.
+            allowed_indices = peak_indices[
+                  np.where(simulation.density_profiles[f"O H - z"][1][peak_indices] > 0.1)[0]
+                  ]
+
+            return self.density_profiles[string_density_dict][0][allowed_indices[0]]
 
         # if 1 dimension
         elif len(pbc_dimensions_indices) == 1:
