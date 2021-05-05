@@ -1964,7 +1964,7 @@ class Simulation:
         Returns:
             surface_area_solid_phase (float): Surface area of the solid phase in A^2.
         """
-        breakpoint()
+        
         # get information about sampling
         start_frame, end_frame, frame_frequency = self._get_sampling_frames(
             start_time, end_time, frame_frequency
