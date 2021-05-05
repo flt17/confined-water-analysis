@@ -397,7 +397,6 @@ def _compute_distribution_for_system_with_one_periodic_direction(
     not_pbc_indices = list(set(pbc_indices) ^ set([0, 1, 2]))
     periodic_vector = np.zeros(3)
     periodic_vector[pbc_indices] = 1
-
     # wrap atoms in box
     # universe.atoms.pack_into_box(box=topology.get_cell_lengths_and_angles(), inplace=True)
 
@@ -406,7 +405,7 @@ def _compute_distribution_for_system_with_one_periodic_direction(
 
     # start by separating solid atoms from liquid atoms
     solid_atoms = universe.select_atoms("not name O H")
-    liquid_atoms = universe.select_atoms("name O H")
+    liquid_atoms = universe.select_atoms("name O")
 
     # this will serve as our anchor for translation for computing the free energy profile
     anchor_coordinates = solid_atoms.center_of_mass()
