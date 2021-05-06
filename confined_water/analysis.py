@@ -135,7 +135,9 @@ class Simulation:
             for count_universe, universe in enumerate(self.velocity_universes):
 
                 solid_segment = universe.add_Segment(segid=0, segname="Solid", segnum=0)
-                liquid_segment = universe.add_Segment(segid=1, segname="Liquid", segnum=0)
+                liquid_segment = universe.add_Segment(
+                    segid=1, segname="Liquid", segnum=0
+                )
 
                 solid_residuum = universe.add_Residue(
                     segment=solid_segment,
@@ -172,7 +174,8 @@ class Simulation:
             )
             # cluster indices of atoms
             atom_indices_water = np.append(
-                hydrogen_atoms.indices[indices_hydrogens_sorted_by_distance[0:2]], oxygen.index
+                hydrogen_atoms.indices[indices_hydrogens_sorted_by_distance[0:2]],
+                oxygen.index,
             )
 
             # now we need to combine them to one residue for each universe
@@ -213,7 +216,9 @@ class Simulation:
 
         # check if all species are a subset of species in system
         if not set(element_mass_dictionary.keys()).issubset(self.species_in_system):
-            raise KeyNotFound(f"At least on of the species specified is not in the system.")
+            raise KeyNotFound(
+                f"At least on of the species specified is not in the system."
+            )
 
         # Loop over all entries of dictionary
         for element, mass in element_mass_dictionary.items():
@@ -226,7 +231,9 @@ class Simulation:
             # check if we need to do the same thing for velocities
             if hasattr(self, "velocity_universes"):
                 for count_universe, universe in enumerate(self.velocity_universes):
-                    universe.atoms[np.where(universe.atoms.names == element)].masses = mass
+                    universe.atoms[
+                        np.where(universe.atoms.names == element)
+                    ].masses = mass
 
     def read_in_simulation_data(
         self,
@@ -250,7 +257,9 @@ class Simulation:
 
         """
         # setup topology based on only pdb file in directoy
-        path_to_topology = utils.get_path_to_file(self.directory_path, "pdb", topology_file_name)
+        path_to_topology = utils.get_path_to_file(
+            self.directory_path, "pdb", topology_file_name
+        )
         self.topology = utils.get_ase_atoms_object(path_to_topology)
 
         # Read in what needs to be read in (right now via if loop)
@@ -378,12 +387,20 @@ class Simulation:
             frame_frequency if frame_frequency is not None else self.frame_frequency
         )
         self.time_between_frames = (
-            time_between_frames if time_between_frames is not None else self.time_between_frames
+            time_between_frames
+            if time_between_frames is not None
+            else self.time_between_frames
         )
 
-        total_time = (self.position_universes[0].trajectory.n_frames - 1) * self.time_between_frames
+        total_time = (
+            self.position_universes[0].trajectory.n_frames - 1
+        ) * self.time_between_frames
         self.end_time = (
-            total_time if end_time == -1 else end_time if end_time is not None else self.end_time
+            total_time
+            if end_time == -1
+            else end_time
+            if end_time is not None
+            else self.end_time
         )
 
         print(f"SUCCESS: New sampling times.")
@@ -462,15 +479,21 @@ class Simulation:
         # set variables important for binning and histogram
         # if no value set for spatial expansion we go up to half the boxlength in z-direction
         spatial_range = (
-            spatial_range if spatial_range else self.topology.get_cell_lengths_and_angles()[2] / 2
+            spatial_range
+            if spatial_range
+            else self.topology.get_cell_lengths_and_angles()[2] / 2
         )
 
-        print(f"Compute radial distribution function up to a radial distance of {spatial_range}")
+        print(
+            f"Compute radial distribution function up to a radial distance of {spatial_range}"
+        )
 
         # define default bin width which will be used to determine number of bins if not given
         default_bin_width = 0.02
         spatial_resolution = (
-            spatial_resolution if spatial_resolution else int(spatial_range / default_bin_width)
+            spatial_resolution
+            if spatial_resolution
+            else int(spatial_range / default_bin_width)
         )
 
         # determine which position universe are to be used in case of PIMD
@@ -482,8 +505,13 @@ class Simulation:
         )
 
         # check whether chosen species are found in universe
-        if species_1 not in self.species_in_system or species_2 not in self.species_in_system:
-            raise KeyNotFound(f"At least on of the species specified is not in the system.")
+        if (
+            species_1 not in self.species_in_system
+            or species_2 not in self.species_in_system
+        ):
+            raise KeyNotFound(
+                f"At least on of the species specified is not in the system."
+            )
 
         rdfs_sampled = []
         # loop over all universes
@@ -516,7 +544,10 @@ class Simulation:
         # write to class attributes
         name_based_on_species = f"{species_1}-{species_2}"
 
-        self.radial_distribution_functions[name_based_on_species] = [calc.bins, averaged_rdf]
+        self.radial_distribution_functions[name_based_on_species] = [
+            calc.bins,
+            averaged_rdf,
+        ]
 
     def compute_water_orientation_profile(
         self,
@@ -564,14 +595,18 @@ class Simulation:
 
             # call function dependent on direction:
             if len(self.pbc_dimensions) == 2:
-                (orientations) = self._compute_water_orientation_profile_along_cartesian_axis(
+                (
+                    orientations
+                ) = self._compute_water_orientation_profile_along_cartesian_axis(
                     universe,
                     start_frame,
                     end_frame,
                     frame_frequency,
                 )
             else:
-                (orientations) = self._compute_water_orientation_profile_in_radial_direction(
+                (
+                    orientations
+                ) = self._compute_water_orientation_profile_in_radial_direction(
                     universe,
                     start_frame,
                     end_frame,
@@ -609,7 +644,9 @@ class Simulation:
 
         # get vector parallel to axis for which we analyse the orientation
         # based on pbc check what direction is investigated
-        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(self.pbc_dimensions)
+        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(
+            self.pbc_dimensions
+        )
         not_pbc_indices = list(set(pbc_dimensions_indices) ^ set([0, 1, 2]))
 
         # initialise mass profile array
@@ -620,7 +657,9 @@ class Simulation:
         heights = np.zeros((number_of_water_molecules, number_of_frames))
         # Loop over trajectory
         for count_frames, frames in enumerate(
-            tqdm((position_universe.trajectory[start_frame:end_frame])[::frame_frequency])
+            tqdm(
+                (position_universe.trajectory[start_frame:end_frame])[::frame_frequency]
+            )
         ):
             # compute dipole vector for each water molecule
             dipole_moment_vector_all_water = np.asarray(
@@ -644,7 +683,9 @@ class Simulation:
                 - reference_atoms.center_of_mass()[not_pbc_indices[0]]
             )
 
-        orientations_over_heights = np.vstack((orientations.flatten(), heights.flatten())).T
+        orientations_over_heights = np.vstack(
+            (orientations.flatten(), heights.flatten())
+        ).T
         return orientations_over_heights
 
     def _compute_water_orientation_profile_in_radial_direction(
@@ -672,7 +713,9 @@ class Simulation:
 
         # get vector parallel to axis for which we analyse the orientation
         # based on pbc check what direction is investigated
-        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(self.pbc_dimensions)
+        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(
+            self.pbc_dimensions
+        )
         not_pbc_indices = list(set(pbc_dimensions_indices) ^ set([0, 1, 2]))
 
         # initialise mass profile array
@@ -684,7 +727,9 @@ class Simulation:
         radial_positions = np.zeros((number_of_water_molecules, number_of_frames))
         # Loop over trajectory
         for count_frames, frames in enumerate(
-            tqdm((position_universe.trajectory[start_frame:end_frame])[::frame_frequency])
+            tqdm(
+                (position_universe.trajectory[start_frame:end_frame])[::frame_frequency]
+            )
         ):
             # compute dipole vector for each water molecule
             dipole_moment_vector_all_water = np.asarray(
@@ -699,7 +744,9 @@ class Simulation:
             )
 
             # compute reference coordinate, i.e. center of mass of all atoms
-            system_center_of_mass = np.ma.array(position_universe.atoms.center_of_mass())
+            system_center_of_mass = np.ma.array(
+                position_universe.atoms.center_of_mass()
+            )
             system_center_of_mass[pbc_dimensions_indices] = np.ma.masked
             reference_coordinates = system_center_of_mass.compressed()
 
@@ -715,11 +762,15 @@ class Simulation:
                     dipole_moment_vector_all_water[:, not_pbc_indices],
                     vectors_2D_oxygens_to_COM,
                 )
-                / np.linalg.norm(dipole_moment_vector_all_water[:, not_pbc_indices], axis=1)
+                / np.linalg.norm(
+                    dipole_moment_vector_all_water[:, not_pbc_indices], axis=1
+                )
                 / np.linalg.norm(vectors_2D_oxygens_to_COM, axis=1)
             )
 
-            radial_positions[:, count_frames] = np.linalg.norm(vectors_2D_oxygens_to_COM, axis=1)
+            radial_positions[:, count_frames] = np.linalg.norm(
+                vectors_2D_oxygens_to_COM, axis=1
+            )
 
         orientations_over_radial_distance = np.vstack(
             (orientations.flatten(), radial_positions.flatten())
@@ -750,7 +801,14 @@ class Simulation:
         """
 
         # check in which direction/orientation density profile should be calculated
-        dictionary_direction = {"x": 0, "y": 1, "z": 2, "radial x": 0, "radial y": 1, "radial z": 2}
+        dictionary_direction = {
+            "x": 0,
+            "y": 1,
+            "z": 2,
+            "radial x": 0,
+            "radial y": 1,
+            "radial z": 2,
+        }
         direction_index = dictionary_direction.get(direction)
         if not direction_index:
             raise KeyNotFound(
@@ -759,7 +817,9 @@ class Simulation:
 
         # check if all species are a subset of species in system
         if not set(species).issubset(self.species_in_system):
-            raise KeyNotFound(f"At least on of the species specified is not in the system.")
+            raise KeyNotFound(
+                f"At least on of the species specified is not in the system."
+            )
 
         # get information about sampling either from given arguments or previously set
         start_frame, end_frame, frame_frequency = self._get_sampling_frames(
@@ -877,7 +937,9 @@ class Simulation:
 
         # Loop over trajectory
         for count_frames, frames in enumerate(
-            tqdm((position_universe.trajectory[start_frame:end_frame])[::frame_frequency])
+            tqdm(
+                (position_universe.trajectory[start_frame:end_frame])[::frame_frequency]
+            )
         ):
 
             # compute reference coordinate, i.e. center of mass of reference atoms in specified direction
@@ -949,7 +1011,9 @@ class Simulation:
         """
         # define range and bin width for histogram binning
         # bin range is simply the half box length along axis orthogonal to direction (squared area)
-        bin_range = self.topology.get_cell_lengths_and_angles()[0:3][direction - 1] * 0.5
+        bin_range = (
+            self.topology.get_cell_lengths_and_angles()[0:3][direction - 1] * 0.5
+        )
         # for now, bin width is set to a default value of 0.1 angstroms
         bin_width = bin_width
         bins_histogram = np.arange(0, bin_range, bin_width)
@@ -959,19 +1023,23 @@ class Simulation:
 
         # Loop over trajectory
         for count_frames, frames in enumerate(
-            tqdm((position_universe.trajectory[start_frame:end_frame])[::frame_frequency])
+            tqdm(
+                (position_universe.trajectory[start_frame:end_frame])[::frame_frequency]
+            )
         ):
 
             # compute reference coordinate, i.e. center of mass of all atoms
-            system_center_of_mass = np.ma.array(position_universe.atoms.center_of_mass())
+            system_center_of_mass = np.ma.array(
+                position_universe.atoms.center_of_mass()
+            )
             system_center_of_mass[direction] = np.ma.masked
             reference_coordinates = system_center_of_mass.compressed()
 
             # compute radial distances from axis through center of mass in given direciton for selected atoms
             positions_atoms_selected = np.ma.array(atoms_selected.positions)
             positions_atoms_selected[:, direction] = np.ma.masked
-            positions_atoms_selected_orthogonal = positions_atoms_selected.compressed().reshape(
-                -1, 2
+            positions_atoms_selected_orthogonal = (
+                positions_atoms_selected.compressed().reshape(-1, 2)
             )
 
             radial_distances_to_axis = np.linalg.norm(
@@ -980,7 +1048,9 @@ class Simulation:
 
             # digitize distances
             # NOTE: values are assigned to bins according to i <= x[i] < i+1
-            digitized_radial_distances = np.digitize(radial_distances_to_axis, bins_histogram)
+            digitized_radial_distances = np.digitize(
+                radial_distances_to_axis, bins_histogram
+            )
 
             # Compute density profile of frame by looping over all bins and check if theres a match
             bins_occupied_by_atoms = np.unique(digitized_radial_distances)
@@ -1059,7 +1129,9 @@ class Simulation:
             universe.trajectory[0]
 
             # create instance of hydrogen_bonding.HydrogenBonding
-            hydrogen_bonding_analysis = hydrogen_bonding.HydrogenBonding(universe, self.topology)
+            hydrogen_bonding_analysis = hydrogen_bonding.HydrogenBonding(
+                universe, self.topology
+            )
 
             # find all acceptor-donor pairs
             hydrogen_bonding_analysis.find_acceptor_donor_pairs(
@@ -1098,7 +1170,9 @@ class Simulation:
 
         # check if all species are a subset of species in system
         if not set(species).issubset(self.species_in_system):
-            raise KeyNotFound(f"At least on of the species specified is not in the system.")
+            raise KeyNotFound(
+                f"At least on of the species specified is not in the system."
+            )
 
         # check if all species are a subset of species in system
         if not self.time_between_frames:
@@ -1134,7 +1208,9 @@ class Simulation:
         # to get water diffusion we need to look at the movement of the center of mass of the molecule
         # if this is the case we simply need to trace allocate only one thrid of the number of atoms
         selected_species_string = " ".join(species)
-        atoms_selected = tmp_position_universe.select_atoms(f"name {selected_species_string}")
+        atoms_selected = tmp_position_universe.select_atoms(
+            f"name {selected_species_string}"
+        )
         number_of_tracers = (
             int(len(atoms_selected) / 3)
             if selected_species_string == "O H"
@@ -1142,7 +1218,9 @@ class Simulation:
         )
 
         # allocate array for all positions of all selected atoms for all frames sampled
-        saved_positions_atoms_selected = np.zeros((number_of_samples, number_of_tracers, 3))
+        saved_positions_atoms_selected = np.zeros(
+            (number_of_samples, number_of_tracers, 3)
+        )
 
         # allocate array for MSD, length of number_of_correlation_frames
         mean_squared_displacement = np.zeros(number_of_correlation_frames)
@@ -1169,7 +1247,11 @@ class Simulation:
 
         # Loop over trajectory to sample all positions of selected atoms
         for count_frames, frames in enumerate(
-            tqdm((tmp_position_universe.trajectory[start_frame:end_frame])[::frame_frequency])
+            tqdm(
+                (tmp_position_universe.trajectory[start_frame:end_frame])[
+                    ::frame_frequency
+                ]
+            )
         ):
 
             # if water diffusion compute center of mass per water molecule
@@ -1183,7 +1265,9 @@ class Simulation:
             if selected_species_string == "O H":
                 # compute center of mass of water molecules
                 center_of_masses_water_molecules = [
-                    atoms_selected[atoms_selected.resids == index_molecule + 1].center_of_mass()
+                    atoms_selected[
+                        atoms_selected.resids == index_molecule + 1
+                    ].center_of_mass()
                     for index_molecule in np.arange(number_of_tracers)
                 ]
                 # center_of_masses_water_molecules = np.asarray(
@@ -1209,7 +1293,9 @@ class Simulation:
         # first check if water diffusion is calculated, i.e. O-H as species name
 
         # Loop over saved positions
-        for frame, positions_per_frame in enumerate(tqdm(saved_positions_atoms_selected)):
+        for frame, positions_per_frame in enumerate(
+            tqdm(saved_positions_atoms_selected)
+        ):
 
             # compute last frame sampled, i.e. usually frame+correlation frames
             last_correlation_frame = frame + number_of_correlation_frames
@@ -1245,7 +1331,8 @@ class Simulation:
 
             # close block when number of samples per block are reached
             if (
-                frame + 1 >= (index_current_block_used + 1) * number_of_samples_per_block
+                frame + 1
+                >= (index_current_block_used + 1) * number_of_samples_per_block
                 or frame + 1 == number_of_samples
             ):
                 # initialise with 0
@@ -1253,12 +1340,15 @@ class Simulation:
                 # check how many samples per frame were taken for this block
                 if index_current_block_used == 0:
                     # in first block this corresponds to the global number of samples correlated
-                    number_of_samples_correlated_per_block = number_of_samples_correlated
+                    number_of_samples_correlated_per_block = (
+                        number_of_samples_correlated
+                    )
                 else:
 
                     # in all others we just need to get the difference between current and previous global samples
                     number_of_samples_correlated_per_block = (
-                        number_of_samples_correlated - previous_global_number_of_samples_correlated
+                        number_of_samples_correlated
+                        - previous_global_number_of_samples_correlated
                     )
 
                 # average current block
@@ -1268,30 +1358,40 @@ class Simulation:
                 )
 
                 # define previous global number of samples
-                previous_global_number_of_samples_correlated = number_of_samples_correlated.copy()
+                previous_global_number_of_samples_correlated = (
+                    number_of_samples_correlated.copy()
+                )
 
                 # increment index to move to next block
                 index_current_block_used += 1
 
         # define time:
         measured_time = (
-            np.arange(number_of_correlation_frames) * self.time_between_frames * frame_frequency
+            np.arange(number_of_correlation_frames)
+            * self.time_between_frames
+            * frame_frequency
         )
 
         # get average MSD
-        average_mean_squared_displacement = mean_squared_displacement / number_of_samples_correlated
+        average_mean_squared_displacement = (
+            mean_squared_displacement / number_of_samples_correlated
+        )
 
         # compute statistical error based on block averags
         std_mean_squared_displacement = np.std(mean_squared_displacement_blocks, axis=0)
 
         # compute diffusion coefficients
-        average_diffusion_coefficient = utils.compute_diffusion_coefficient_based_on_MSD(
-            average_mean_squared_displacement, measured_time
+        average_diffusion_coefficient = (
+            utils.compute_diffusion_coefficient_based_on_MSD(
+                average_mean_squared_displacement, measured_time
+            )
         )
 
         diffusion_coefficient_block = np.asarray(
             [
-                utils.compute_diffusion_coefficient_based_on_MSD(MSD_per_block, measured_time)
+                utils.compute_diffusion_coefficient_based_on_MSD(
+                    MSD_per_block, measured_time
+                )
                 for MSD_per_block in mean_squared_displacement_blocks
             ]
         )
@@ -1368,7 +1468,9 @@ class Simulation:
         # to get water diffusion we need to look at the movement of the center of mass of the molecule
         # if this is the case we simply need to trace allocate only one thrid of the number of atoms
         selected_species_string = " ".join(species)
-        atoms_selected = tmp_velocity_universe.select_atoms(f"name {selected_species_string}")
+        atoms_selected = tmp_velocity_universe.select_atoms(
+            f"name {selected_species_string}"
+        )
         number_of_tracers = (
             int(len(atoms_selected) / 3)
             if selected_species_string == "O H"
@@ -1376,7 +1478,9 @@ class Simulation:
         )
 
         # allocate array for all velocities of all selected atoms for all frames sampled
-        saved_velocities_atoms_selected = np.zeros((number_of_samples, number_of_tracers, 3))
+        saved_velocities_atoms_selected = np.zeros(
+            (number_of_samples, number_of_tracers, 3)
+        )
 
         # allocate array for VACF, length of number_of_correlation_frames
         VACF = np.zeros(number_of_correlation_frames)
@@ -1401,7 +1505,11 @@ class Simulation:
 
         # Loop over trajectory to sample all positions of selected atoms
         for count_frames, frames in enumerate(
-            tqdm((tmp_velocity_universe.trajectory[start_frame:end_frame])[::frame_frequency])
+            tqdm(
+                (tmp_velocity_universe.trajectory[start_frame:end_frame])[
+                    ::frame_frequency
+                ]
+            )
         ):
 
             # if water diffusion compute center of mass per water molecule
@@ -1415,7 +1523,9 @@ class Simulation:
             if selected_species_string == "O H":
                 # compute center of mass of water molecules
                 center_of_masses_water_molecules = [
-                    atoms_selected[atoms_selected.resids == index_molecule + 1].center_of_mass()
+                    atoms_selected[
+                        atoms_selected.resids == index_molecule + 1
+                    ].center_of_mass()
                     for index_molecule in np.arange(number_of_tracers)
                 ]
 
@@ -1429,7 +1539,9 @@ class Simulation:
                 )
 
         # Loop over saved positions
-        for frame, velocities_per_frames in enumerate(tqdm(saved_velocities_atoms_selected)):
+        for frame, velocities_per_frames in enumerate(
+            tqdm(saved_velocities_atoms_selected)
+        ):
 
             # compute last frame sampled, i.e. usually frame+correlation frames
             last_correlation_frame = frame + number_of_correlation_frames
@@ -1454,11 +1566,14 @@ class Simulation:
 
             VACF[0:number_of_frames_correlated] += VACF_per_frame
             # to get insight on the statistical error we compute block averages
-            VACF_block[index_current_block_used, 0:number_of_frames_correlated] += VACF_per_frame
+            VACF_block[
+                index_current_block_used, 0:number_of_frames_correlated
+            ] += VACF_per_frame
 
             # close block when number of samples per block are reached
             if (
-                frame + 1 >= (index_current_block_used + 1) * number_of_samples_per_block
+                frame + 1
+                >= (index_current_block_used + 1) * number_of_samples_per_block
                 or frame + 1 == number_of_samples
             ):
                 # initialise with 0
@@ -1466,21 +1581,27 @@ class Simulation:
                 # check how many samples per frame were taken for this block
                 if index_current_block_used == 0:
                     # in first block this corresponds to the global number of samples correlated
-                    number_of_samples_correlated_per_block = number_of_samples_correlated
+                    number_of_samples_correlated_per_block = (
+                        number_of_samples_correlated
+                    )
                 else:
 
                     # in all others we just need to get the difference between current and previous global samples
                     number_of_samples_correlated_per_block = (
-                        number_of_samples_correlated - previous_global_number_of_samples_correlated
+                        number_of_samples_correlated
+                        - previous_global_number_of_samples_correlated
                     )
 
                 # average current block
                 VACF_block[index_current_block_used, :] = (
-                    VACF_block[index_current_block_used, :] / number_of_samples_correlated_per_block
+                    VACF_block[index_current_block_used, :]
+                    / number_of_samples_correlated_per_block
                 )
 
                 # define previous global number of samples
-                previous_global_number_of_samples_correlated = number_of_samples_correlated.copy()
+                previous_global_number_of_samples_correlated = (
+                    number_of_samples_correlated.copy()
+                )
 
                 # increment index to move to next block
                 index_current_block_used += 1
@@ -1501,7 +1622,9 @@ class Simulation:
             else 1
         )
         # Compute prefactor for unit conversion
-        prefactor = velocity_unit_conversion ** 2 * global_variables.FEMTOSECOND_TO_SECOND / 3
+        prefactor = (
+            velocity_unit_conversion ** 2 * global_variables.FEMTOSECOND_TO_SECOND / 3
+        )
 
         # compute ensemble average of diffusion
         average_diffusion_coefficient = (
@@ -1529,7 +1652,9 @@ class Simulation:
 
         # define time:
         measured_time = (
-            np.arange(number_of_correlation_frames) * self.time_between_frames * frame_frequency
+            np.arange(number_of_correlation_frames)
+            * self.time_between_frames
+            * frame_frequency
         )
 
         # save all data to dictionary of class
@@ -1575,7 +1700,9 @@ class Simulation:
         )
         # convert correlation_time to correlation_frames taken into account the time between frames and
         # the frame frequency
-        number_of_correlation_frames = int(correlation_time / time_between_frames / frame_frequency)
+        number_of_correlation_frames = int(
+            correlation_time / time_between_frames / frame_frequency
+        )
 
         # check if correlation time can be obtained with current trajectory:
         number_of_samples = int((end_frame - start_frame) / frame_frequency)
@@ -1615,7 +1742,9 @@ class Simulation:
 
         # Loop over summed forces in the desired direction
         for frame, summed_forces_per_frame in enumerate(
-            tqdm((summed_force_all_directions[start_frame:end_frame])[::frame_frequency])
+            tqdm(
+                (summed_force_all_directions[start_frame:end_frame])[::frame_frequency]
+            )
         ):
 
             # compute last frame sampled, i.e. usually frame+correlation frames
@@ -1648,7 +1777,8 @@ class Simulation:
 
             # close block when number of samples per block are reached
             if (
-                frame + 1 >= (index_current_block_used + 1) * number_of_samples_per_block
+                frame + 1
+                >= (index_current_block_used + 1) * number_of_samples_per_block
                 or frame + 1 == number_of_samples
             ):
                 # initialise with 0
@@ -1656,22 +1786,31 @@ class Simulation:
                 # check how many samples per frame were taken for this block
                 if index_current_block_used == 0:
                     # in first block this corresponds to the global number of samples correlated
-                    number_of_samples_correlated_per_block = number_of_samples_correlated
+                    number_of_samples_correlated_per_block = (
+                        number_of_samples_correlated
+                    )
                 else:
 
                     # in all others we just need to get the difference between current and previous global samples
                     number_of_samples_correlated_per_block = (
-                        number_of_samples_correlated - previous_global_number_of_samples_correlated
+                        number_of_samples_correlated
+                        - previous_global_number_of_samples_correlated
                     )
 
                 # average current block
-                autocorrelation_total_summed_forces_block[index_current_block_used, :] = (
-                    autocorrelation_total_summed_forces_block[index_current_block_used, :]
+                autocorrelation_total_summed_forces_block[
+                    index_current_block_used, :
+                ] = (
+                    autocorrelation_total_summed_forces_block[
+                        index_current_block_used, :
+                    ]
                     / number_of_samples_correlated_per_block
                 )
 
                 # define previous global number of samples
-                previous_global_number_of_samples_correlated = number_of_samples_correlated.copy()
+                previous_global_number_of_samples_correlated = (
+                    number_of_samples_correlated.copy()
+                )
 
                 # increment index to move to next block
                 index_current_block_used += 1
@@ -1730,13 +1869,17 @@ class Simulation:
         # save all data to dictionary of class
         string_for_dict = f"ct: {correlation_time}"
         self.autocorrelation_summed_forces[string_for_dict] = [
-            np.arange(number_of_correlation_frames) * time_between_frames * frame_frequency,
+            np.arange(number_of_correlation_frames)
+            * time_between_frames
+            * frame_frequency,
             average_autocorrelation_total_summed_forces,
             std_autocorrelation_total_summed_forces,
         ]
 
         self.friction_coefficients[string_for_dict] = [
-            np.arange(number_of_correlation_frames) * time_between_frames * frame_frequency,
+            np.arange(number_of_correlation_frames)
+            * time_between_frames
+            * frame_frequency,
             average_friction_coefficient,
             std_friction_coefficient,
         ]
@@ -1765,7 +1908,9 @@ class Simulation:
         # dependent on pbc-dimensions compute surface area
         if len(pbc_dimensions_indices) > 1:
             # assume sheet
-            return np.prod(self.topology.get_cell_lengths_and_angles()[pbc_dimensions_indices])
+            return np.prod(
+                self.topology.get_cell_lengths_and_angles()[pbc_dimensions_indices]
+            )
 
         else:
             # in case we have a tube start we need to compute the radius first
@@ -1825,7 +1970,11 @@ class Simulation:
             # Loop over trajectory, as the radius should converge quickly we take only every 10th frame in comparison
             # to the global settings
             for count_frames, frames in enumerate(
-                tqdm((universe.trajectory[start_frame:end_frame])[:: int(frame_frequency)])
+                tqdm(
+                    (universe.trajectory[start_frame:end_frame])[
+                        :: int(frame_frequency)
+                    ]
+                )
             ):
 
                 # determine center of mass:
@@ -1844,7 +1993,8 @@ class Simulation:
 
                 # compute radial distance of solid atoms in non-periodic directions from center of mass
                 radial_distances_to_axis = np.linalg.norm(
-                    solid_atoms_positions_confined_directions - reference_coordinates, axis=1
+                    solid_atoms_positions_confined_directions - reference_coordinates,
+                    axis=1,
                 )
 
                 radii_universe.append(np.mean(radial_distances_to_axis))
@@ -1865,7 +2015,9 @@ class Simulation:
         """
 
         # based on pbc check what direction is investigated
-        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(self.pbc_dimensions)
+        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(
+            self.pbc_dimensions
+        )
 
         not_pbc_dimensions = list(set(self.pbc_dimensions) ^ set("xyz"))
         not_pbc_indices = list(set(pbc_dimensions_indices) ^ set([0, 1, 2]))
@@ -1910,8 +2062,8 @@ class Simulation:
             # the contact layer. To avoid ambiguity, we introduce a minimum density for which we accept the peak
             # index.
             allowed_indices = peak_indices[
-                  np.where(self.density_profiles[f"O H - z"][1][peak_indices] > 0.1)[0]
-                  ]
+                np.where(self.density_profiles[f"O H - z"][1][peak_indices] > 0.1)[0]
+            ]
 
             return self.density_profiles[string_density_dict][0][allowed_indices[0]]
 
@@ -1954,6 +2106,7 @@ class Simulation:
         start_time: int = None,
         end_time: int = None,
         frame_frequency: int = None,
+        frame_frequency_radius: int = None,
     ):
         """
         Compute the free energy profile of water on top of solid surface.
@@ -1961,13 +2114,21 @@ class Simulation:
             start_time (int) : Start time for analysis (optional).
             end_time (int) : End time for analysis (optional).
             frame_frequency (int): Take every nth frame only (optional).
+            frame_frequency_radius (int): Take every nth frame only for computing radius(optional).
         Returns:
             surface_area_solid_phase (float): Surface area of the solid phase in A^2.
         """
-        
+
         # get information about sampling
         start_frame, end_frame, frame_frequency = self._get_sampling_frames(
             start_time, end_time, frame_frequency
+        )
+
+        # adjust frame_frequency for tube radius
+        frame_frequency_radius = (
+            frame_frequency * 200
+            if frame_frequency_radius == None
+            else frame_frequency_radius
         )
 
         # determine which position universe are to be used in case of PIMD
@@ -1978,7 +2139,9 @@ class Simulation:
             else self.position_universes[1::]
         )
         # get periodic directions:
-        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(self.pbc_dimensions)
+        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(
+            self.pbc_dimensions
+        )
 
         # compute spatial extent of contact layer
         spatial_extent_contact_layer = self.get_water_contact_layer_on_interface()
@@ -1986,7 +2149,7 @@ class Simulation:
         # compute average tube radius if tube
         if len(pbc_dimensions_indices) == 1:
             self.tube_radius = self.compute_tube_radius(
-                pbc_dimensions_indices, start_time, end_time, frame_frequency
+                pbc_dimensions_indices, start_time, end_time, frame_frequency_radius
             )
 
         else:
@@ -2031,7 +2194,9 @@ class Simulation:
         """
 
         # get periodic directions:
-        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(self.pbc_dimensions)
+        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(
+            self.pbc_dimensions
+        )
 
         # raise error if tube as system but no tube radius given
         if len(pbc_dimensions_indices) == 1 and self.tube_radius == 0:
