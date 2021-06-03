@@ -117,7 +117,7 @@ class FreeEnergyProfile:
         else:
             replica_array = plot_replica
         # now multiply this representation according to given number of replica
-        hist_liquid_final = np.tile(hist_liquid_projected_normalised, replica_array)
+        hist_liquid_final = np.tile(hist_liquid_projected_normalised, replica_array[::-1])
 
         # now, finally, compute, free energy
         free_energy_profile_liquid = (
