@@ -35,7 +35,7 @@ class FreeEnergyProfile:
         pbc_indices,
         number_of_bins: int,
         multiples_of_unit_cell,
-        plot_replica: int = 3,
+        plot_replica= 3,
         tube_radius: float = None,
     ):
         """
@@ -46,7 +46,7 @@ class FreeEnergyProfile:
             pbc_indices: Direction indices in which system is periodic.
             number_of_bins (int): number of bins used for larger dimension, lower dimensions will be adjusted.
             multiples_of_unit_cell: integer array of periodic replica in 2D.
-            plot_replica (int) : Number of replica of the unit cell plotted in 2D.
+            plot_replica (int, array of scalar) : Number of replica of the unit cell plotted in 2D. If array first element in x, second in y direction.
             tube_radius (float) : tube radius of tube in A.
 
         Returns:
@@ -112,8 +112,12 @@ class FreeEnergyProfile:
         # now normalise to get a probablity
         hist_liquid_projected_normalised = hist_liquid_projected / np.sum(hist_liquid_projected)
 
+        if not (np.array(plot_replica)).shape:
+            replica_array = [plot_replica, plot_replica]
+        else:
+            replica_array = plot_replica
         # now multiply this representation according to given number of replica
-        hist_liquid_final = np.tile(hist_liquid_projected_normalised, [plot_replica, plot_replica])
+        hist_liquid_final = np.tile(hist_liquid_projected_normalised, replica_array)
 
         # now, finally, compute, free energy
         free_energy_profile_liquid = (
@@ -125,11 +129,11 @@ class FreeEnergyProfile:
 
         # adapt xedges and yedges accordingly
         xedges_free_energy_liquid = np.linspace(
-            0, range_x[1] / dim_x * plot_replica, bins_x_unit * plot_replica + 1
+            0, range_x[1] / dim_x * replica_array[0], bins_x_unit * replica_array[0] + 1
         )
 
         yedges_free_energy_liquid = np.linspace(
-            0, range_y[1] / dim_y * plot_replica, bins_y_unit * plot_replica + 1
+            0, range_y[1] / dim_y * replica_array[1], bins_y_unit * replica_array[1] + 1
         )
 
         self.free_energy_profile_liquid = [
@@ -183,8 +187,8 @@ class FreeEnergyProfile:
                         x_rep * xedges_unit[-1],
                         y_rep * yedges_unit[-1],
                     ]
-                    for x_rep in np.arange(plot_replica)
-                    for y_rep in np.arange(plot_replica)
+                    for x_rep in np.arange(replica_array[0])
+                    for y_rep in np.arange(replica_array[1])
                 ]
             )
 
