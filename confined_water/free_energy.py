@@ -293,7 +293,7 @@ def compute_spatial_distribution_of_atoms_on_interface(
     topology,
     spatial_extent_contact_layer: float,
     pbc_indices,
-    species: str = "O",
+    species,
     start_frame: int,
     end_frame: int,
     frame_frequency: int,
