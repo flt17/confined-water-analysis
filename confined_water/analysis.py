@@ -2103,6 +2103,7 @@ class Simulation:
     def compute_free_energy_profile(
         self,
         tube_length_in_unit_cells: int = None,
+        species: str = "O",
         start_time: int = None,
         end_time: int = None,
         frame_frequency: int = None,
@@ -2170,6 +2171,7 @@ class Simulation:
                 self.topology,
                 spatial_extent_contact_layer,
                 pbc_dimensions_indices,
+                species,
                 start_frame,
                 end_frame,
                 frame_frequency,

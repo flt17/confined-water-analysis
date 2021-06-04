@@ -293,6 +293,7 @@ def compute_spatial_distribution_of_atoms_on_interface(
     topology,
     spatial_extent_contact_layer: float,
     pbc_indices,
+    species: str = "O",
     start_frame: int,
     end_frame: int,
     frame_frequency: int,
@@ -306,6 +307,7 @@ def compute_spatial_distribution_of_atoms_on_interface(
         topology : ASE atoms object containing information about topology.
         spatial_extent_contact_layer (float): How far ranges the water contact layer.
         pbc_indices : Direction indices in which system is periodic
+        species : Element used to perform analysis (O or H)
         start_frame (int) : Start frame for analysis.
         end_frame (int) : End frame for analysis.
         frame_frequency (int): Take every nth frame only.
@@ -327,6 +329,7 @@ def compute_spatial_distribution_of_atoms_on_interface(
             tube_radius,
             tube_length_in_unit_cells,
             pbc_indices,
+            species,
             start_frame,
             end_frame,
             frame_frequency,
@@ -341,6 +344,7 @@ def compute_spatial_distribution_of_atoms_on_interface(
             topology,
             spatial_extent_contact_layer,
             pbc_indices,
+            species,
             start_frame,
             end_frame,
             frame_frequency,
@@ -379,6 +383,7 @@ def _compute_distribution_for_system_with_one_periodic_direction(
     tube_radius: float,
     tube_length_in_unit_cells: int,
     pbc_indices,
+    species,
     start_frame: int,
     end_frame: int,
     frame_frequency: int,
@@ -392,6 +397,7 @@ def _compute_distribution_for_system_with_one_periodic_direction(
         tube_radius (float) : radius of the tube in A.
         tube_length_in_unit_cells (int): multiples of tube unit cell in periodic direction.
         pbc_indices : Direction indices in which system is periodic
+        species : Element to perform analysis with.
         start_frame (int) : Start frame for analysis.
         end_frame (int) : End frame for analysis.
         frame_frequency (int): Take every nth frame only.
@@ -409,7 +415,7 @@ def _compute_distribution_for_system_with_one_periodic_direction(
 
     # start by separating solid atoms from liquid atoms
     solid_atoms = universe.select_atoms("not name O H")
-    liquid_atoms = universe.select_atoms("name O")
+    liquid_atoms = universe.select_atoms(f"name {species}")
 
     # this will serve as our anchor for translation for computing the free energy profile
     anchor_coordinates = solid_atoms.center_of_mass()
@@ -562,6 +568,7 @@ def _compute_distribution_for_system_with_two_periodic_directions(
     topology,
     spatial_extent_contact_layer: float,
     pbc_indices,
+    species,
     start_frame: int,
     end_frame: int,
     frame_frequency: int,
@@ -573,6 +580,7 @@ def _compute_distribution_for_system_with_two_periodic_directions(
         topology : ASE atoms object containing information about topology.
         spatial_extent_contact_layer (float): How far ranges the water contact layer.
         pbc_indices : Direction indices in which system is periodic
+        species : element to perform analysis with (O or H)
         start_frame (int) : Start frame for analysis.
         end_frame (int) : End frame for analysis.
         frame_frequency (int): Take every nth frame only.
@@ -599,7 +607,7 @@ def _compute_distribution_for_system_with_two_periodic_directions(
     solid_atoms = universe.select_atoms("not name O H")
 
     # approximate water with oxygens here
-    liquid_atoms = universe.select_atoms("name O")
+    liquid_atoms = universe.select_atoms(f"name {species}")
 
     # this will serve as our anchor for computing the free energy profile
     anchor_coordinates = solid_atoms.center_of_mass()
