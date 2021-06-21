@@ -161,18 +161,18 @@ class HydrogenBonding:
 
             # split hydrogen positions according to respective waters
             hydrogen_positions_split = np.split(
-                hydrogen_atoms.positions, number_of_water_molecules
+                hydrogen_atoms.positions[np.argsort(hydrogen_atoms.resids)], number_of_water_molecules
             )
 
             # define all vectors from oxygens to covalently bonded hydrogens
-            vectors_oxyen_covalent_hydrogens_split = (
+            vectors_oxygen_covalent_hydrogens_split = (
                 hydrogen_positions_split - oxygen_atoms.positions[:, np.newaxis]
             )
 
             # apply MIC to all vectors
-            vectors_oxyen_covalent_hydrogens_split_MIC = (
+            vectors_oxygen_covalent_hydrogens_split_MIC = (
                 utils.apply_minimum_image_convention_to_interatomic_vectors(
-                    vectors_oxyen_covalent_hydrogens_split,
+                    vectors_oxygen_covalent_hydrogens_split,
                     self.topology.cell,
                     pbc_dimensions,
                 )
@@ -182,7 +182,7 @@ class HydrogenBonding:
             distances_acceptor_oxygen_hydrogen_crit1_split = [
                 (
                     np.linalg.norm(
-                        vectors_oxyen_covalent_hydrogens_split_MIC[i]
+                        vectors_oxygen_covalent_hydrogens_split_MIC[i]
                         - vectors_oxygen_oxygen_crit1_split[i][:, np.newaxis],
                         axis=2,
                     )
@@ -200,13 +200,13 @@ class HydrogenBonding:
                         np.clip(
                             (
                                 np.dot(
-                                    vectors_oxyen_covalent_hydrogens_split_MIC[i],
+                                    vectors_oxygen_covalent_hydrogens_split_MIC[i],
                                     vectors_oxygen_oxygen_crit1_split[i].T,
                                 )
                                 / distances_oxygen_oxygen_crit1_split[i]
                             )
                             / np.linalg.norm(
-                                vectors_oxyen_covalent_hydrogens_split_MIC[i], axis=1
+                                vectors_oxygen_covalent_hydrogens_split_MIC[i], axis=1
                             ).reshape((2, -1)),
                             -1,
                             1,
@@ -320,10 +320,10 @@ class HydrogenBonding:
             # compute delta distance: r_(O-H)-r(H...O)
             # 1. distances between donor oxygen and hydrogen
 
-            distances_oxyen_covalent_hydrogens = np.concatenate(
+            distances_oxygen_covalent_hydrogens = np.concatenate(
                 [
                     np.linalg.norm(
-                        vectors_oxyen_covalent_hydrogens_split_MIC[
+                        vectors_oxygen_covalent_hydrogens_split_MIC[
                             i, tmp_indices_crit123[i][0]
                         ],
                         axis=1,
@@ -336,7 +336,7 @@ class HydrogenBonding:
             distances_acceptor_oxygen_H = np.concatenate(
                 [
                     np.linalg.norm(
-                        vectors_oxyen_covalent_hydrogens_split_MIC[
+                        vectors_oxygen_covalent_hydrogens_split_MIC[
                             i, tmp_indices_crit123[i][0]
                         ]
                         - vectors_oxygen_oxygen_crit1_split[i][
@@ -350,7 +350,7 @@ class HydrogenBonding:
 
             # 3. compute delta_distance
             donor_acceptor_pairs_per_frame.delta_distances = (
-                distances_oxyen_covalent_hydrogens - distances_acceptor_oxygen_H
+                distances_oxygen_covalent_hydrogens - distances_acceptor_oxygen_H
             )
 
             # save coordinates of hydrogen bond, first acceptor
@@ -560,36 +560,37 @@ class HydrogenBonding:
 
             # split hydrogen positions according to respective waters
             hydrogen_positions_split = np.split(
-                hydrogens_contact.positions, len(oxygen_atoms_in_contact_layer)
+                hydrogens_contact.positions[np.argsort(hydrogens_contact.resids)], len(oxygen_atoms_in_contact_layer)
             )
 
             # define all vectors from oxygens to covalently bonded hydrogens
-            vectors_oxyen_covalent_hydrogens_split = (
+            vectors_oxygen_covalent_hydrogens_split = (
                 hydrogen_positions_split - oxygen_atoms_in_contact_layer.positions[:, np.newaxis]
             )
 
             # apply MIC to all vectors
-            vectors_oxyen_covalent_hydrogens_split_MIC = (
+            vectors_oxygen_covalent_hydrogens_split_MIC = (
                 utils.apply_minimum_image_convention_to_interatomic_vectors(
-                    vectors_oxyen_covalent_hydrogens_split,
+                    vectors_oxygen_covalent_hydrogens_split,
                     self.topology.cell,
                     pbc_dimensions,
                 )
             )
             # compute angles
+
             angles_oxygen_hydrogen_heavy = [
                 np.rad2deg(
                     np.arccos(
                         np.clip(
                             (
                                 np.dot(
-                                    vectors_oxyen_covalent_hydrogens_split_MIC[i],
+                                    vectors_oxygen_covalent_hydrogens_split_MIC[i],
                                     vectors_contact_heavy_split[i].T,
                                 )
                                 / distances_contact_heavy_split[i]
                             )
                             / np.linalg.norm(
-                                vectors_oxyen_covalent_hydrogens_split_MIC[i], axis=1
+                                vectors_oxygen_covalent_hydrogens_split_MIC[i], axis=1
                             ).reshape((2, -1)),
                             -1,
                             1,
