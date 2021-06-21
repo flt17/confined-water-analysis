@@ -1194,8 +1194,8 @@ class Simulation:
                 end_frame,
                 frame_frequency,
                 self.time_between_frames,
-                self.pbc_dimensions,
                 self.get_water_contact_layer_on_interface()
+                self.pbc_dimensions,
                 )
 
             hydrogen_bonding_objects.append(hydrogen_bonding_analysis)
