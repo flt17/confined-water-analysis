@@ -1194,7 +1194,7 @@ class Simulation:
                 end_frame,
                 frame_frequency,
                 self.time_between_frames,
-                self.get_water_contact_layer_on_interface()
+                self.get_water_contact_layer_on_interface(),
                 self.pbc_dimensions,
                 )
 
