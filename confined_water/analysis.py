@@ -1147,7 +1147,7 @@ class Simulation:
         self.hydrogen_bonding = hydrogen_bonding_objects
 
     def set_up_heavy_atom_analysis(
-        self, start_time: int = None, end_time: int = None, frame_frequency: int = None
+        self, max_heavy_atom_distance = 3.5, start_time: int = None, end_time: int = None, frame_frequency: int = None
     ):
 
         """
@@ -1196,6 +1196,7 @@ class Simulation:
                 self.time_between_frames,
                 self.get_water_contact_layer_on_interface(),
                 self.pbc_dimensions,
+                max_heavy_atom_distance
                 )
 
             hydrogen_bonding_objects.append(hydrogen_bonding_analysis)
