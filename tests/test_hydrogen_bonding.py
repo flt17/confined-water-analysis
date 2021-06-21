@@ -53,3 +53,31 @@ class TestHydrogenBondingFindAcceptorDonorPairs:
         )
 
         assert np.max(hydrogen_bonding_analysis.dataframe["Time"]) == 2000
+
+
+class TestHydrogenBondingHeavyAtomsAnalysis:
+    def test_returns_pandas_dataframe_for_carbon_nanotube(self):
+
+        path = "./files/water_in_carbon_nanotube/m12_n12/classical"
+
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True)
+
+        simulation.set_pbc_dimensions("z")
+
+        hydrogen_bonding_analysis = hydrogen_bonding.HydrogenBonding(
+            simulation.position_universes[0], simulation.topology
+        )
+
+        hydrogen_bonding_analysis.heavy_atoms_analysis(
+            start_frame=0,
+            end_frame=-1,
+            frame_frequency=10,
+            time_between_frames=20,
+            pbc_dimensions="z",
+            spatial_extent_contact_layer=3.65
+        )
+
+        assert len(np.unique(hydrogen_bonding_analysis.heavy_atoms_dataframe["Species"])) == 2
+

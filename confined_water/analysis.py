@@ -1146,6 +1146,62 @@ class Simulation:
 
         self.hydrogen_bonding = hydrogen_bonding_objects
 
+    def set_up_heavy_atom_analysis(
+        self, start_time: int = None, end_time: int = None, frame_frequency: int = None
+    ):
+
+        """
+        Prepare everything for hydrogen bonding analysis by initialsing instance of
+        HydrogenBonding for each position_universe. This will be used to identify
+        all hydrogen bonds within the given times.
+        Arguments:
+            start_time (int) : Start time for analysis (optional).
+            end_time (int) : End time for analysis (optional).
+            frame_frequency (int): Take every nth frame only (optional).
+        Returns:
+
+        """
+
+        # get information about sampling either from given arguments or previously set
+        start_frame, end_frame, frame_frequency = self._get_sampling_frames(
+            start_time, end_time, frame_frequency
+        )
+
+        # determine which position universe are to be used in case of PIMD
+        # Thermodynamic properties are based on trajectory of replica
+        tmp_position_universes = (
+            self.position_universes
+            if len(self.position_universes) == 1
+            else self.position_universes[1::]
+        )
+
+        hydrogen_bonding_objects = []
+
+        # Loop over all universes
+        for count_universe, universe in enumerate(tmp_position_universes):
+
+            # rewind trajectory
+            universe.trajectory[0]
+
+            # create instance of hydrogen_bonding.HydrogenBonding
+            hydrogen_bonding_analysis = hydrogen_bonding.HydrogenBonding(
+                universe, self.topology
+            )
+
+            # find all heavy atom pairs
+            hydrogen_bonding_analysis.heavy_atoms_analysis(
+                start_frame,
+                end_frame,
+                frame_frequency,
+                self.time_between_frames,
+                self.pbc_dimensions,
+                self.get_water_contact_layer_on_interface()
+                )
+
+            hydrogen_bonding_objects.append(hydrogen_bonding_analysis)
+
+        self.hydrogen_bonding = hydrogen_bonding_objects
+
     def compute_mean_squared_displacement(
         self,
         species: list,
