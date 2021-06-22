@@ -480,6 +480,9 @@ class HydrogenBonding:
             # initialise instance of DonorAcceptorPairs which will be used to save all information.
             heavy_atom_pairs_per_frame = HeavyAtomPairs()
 
+            # save time of the frame
+            heavy_atom_pairs_per_frame.time = frames.frame * time_between_frames
+
             # define center of mass of solid now
             solid_COM = solid_atoms.center_of_mass()
 
@@ -617,6 +620,14 @@ class HydrogenBonding:
             # save all pairs to object
             ##########################
 
+            # id of donor water molecule
+            
+            heavy_atom_pairs_per_frame.water_ids = np.concatenate([
+                np.repeat(oxygen_atoms_in_contact_layer.resids[contact_water] - 1,dictionary_number_of_heavy_atoms_per_oxygen[contact_water])
+                for contact_water in np.arange(len(oxygen_atoms_in_contact_layer))
+            ])
+            
+
             # heavy atom species
             heavy_atom_pairs_per_frame.heavy_atom_species = np.concatenate(
                 [
@@ -631,21 +642,17 @@ class HydrogenBonding:
             )
 
             # distance between hydrogens and heavy atom
-            heavy_atom_pairs_per_frame.hydrogens_heavy_atom_distances = (
-                np.concatenate(
-                    [
-                        np.linalg.norm(
-                            vectors_contact_heavy_split[contact_water][np.newaxis, :]
-                            - vectors_oxygen_covalent_hydrogens_split_MIC[
-                                contact_water
-                            ][:, np.newaxis],
-                            axis=2,
-                        ).T
-                        for contact_water in np.arange(
-                            len(oxygen_atoms_in_contact_layer)
-                        )
-                    ]
-                )
+            heavy_atom_pairs_per_frame.hydrogens_heavy_atom_distances = np.concatenate(
+                [
+                    np.linalg.norm(
+                        vectors_contact_heavy_split[contact_water][np.newaxis, :]
+                        - vectors_oxygen_covalent_hydrogens_split_MIC[contact_water][
+                            :, np.newaxis
+                        ],
+                        axis=2,
+                    ).T
+                    for contact_water in np.arange(len(oxygen_atoms_in_contact_layer))
+                ]
             )
             # heavy_atom_pairs_per_frame.hydrogen_heavy_atom_distances = vectors_contact_heavy_split
 
@@ -666,6 +673,8 @@ class HydrogenBonding:
         heavy_atom_dataframe = pandas.DataFrame(
             heavy_atom_data,
             columns=[
+                "Time",
+                "Water molecule index",
                 "Species",
                 "O-X Distance",
                 "H1-X Distance",
@@ -757,13 +766,14 @@ class HeavyAtomPairs:
         Returns:
             array (np.array): contains all information in stacked array.
         """
-        
         array = np.vstack(
             [
+                np.repeat(self.time, len(self.heavy_atom_species)),
+                self.water_ids,
                 self.heavy_atom_species,
                 self.heavy_atom_distances,
-                self.hydrogens_heavy_atom_distances[:,0],
-                self.hydrogens_heavy_atom_distances[:,1],
+                self.hydrogens_heavy_atom_distances[:, 0],
+                self.hydrogens_heavy_atom_distances[:, 1],
                 self.angles[:, 0],
                 self.angles[:, 1],
             ]

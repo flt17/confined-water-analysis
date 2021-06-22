@@ -78,7 +78,7 @@ class TestHydrogenBondingHeavyAtomsAnalysis:
             pbc_dimensions="z",
             spatial_extent_contact_layer=3.65
         )
-
+        
         assert len(np.unique(hydrogen_bonding_analysis.heavy_atoms_dataframe["Species"])) == 2
 
     def test_returns_pandas_dataframe_for_graphene(self):
