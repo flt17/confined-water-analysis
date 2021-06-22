@@ -279,7 +279,7 @@ class TestApplyMinimumImageConventionToInteratomicVectors:
             dipole_moment_vectors = []
             for water_index in np.arange(number_of_water_molecules):
                 water_atoms = simulation.position_universes[0].select_atoms(
-                    f"resname W{water_index+1}"
+                    f"resid {water_index+1}"
                 )
 
                 dipole_moment_vectors.append(

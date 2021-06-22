@@ -163,9 +163,28 @@ class TestSimulation_ComputeWaterOrientationProfileAlongCartesianAxis:
         simulation.compute_water_orientation_profile(frame_frequency=10)
 
         assert (
-            np.max(simulation.water_orientations_spatially_resolved[0][:, 0]) <= 1
-            and np.min(simulation.water_orientations_spatially_resolved[0][:, 0]) >= -1
+            np.max(simulation.water_orientations_spatially_resolved["Dipole"][0][:, 0]) <= 1
+            and np.min(simulation.water_orientations_spatially_resolved["Dipole"][0][:, 0]) >= -1
         )
+
+    def test_returns_profile_in_z_direction_OH(self):
+        path = "./files/water_on_graphene"
+
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True)
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+        simulation.set_pbc_dimensions("xy")
+
+        simulation.compute_water_orientation_profile(water_vector="O-H",frame_frequency=10)
+
+        assert (
+            np.max(simulation.water_orientations_spatially_resolved["O-H"][0][:, 0]) <= 1
+            and np.min(simulation.water_orientations_spatially_resolved["O-H"][0][:, 0]) >= -1
+        )
+
 
 
 class TestSimulation_ComputeWaterOrientationInRadialDirection:
@@ -181,10 +200,28 @@ class TestSimulation_ComputeWaterOrientationInRadialDirection:
         simulation.set_pbc_dimensions("z")
 
         simulation.compute_water_orientation_profile(frame_frequency=10)
+       
+        assert (
+            np.max(simulation.water_orientations_spatially_resolved["Dipole"][0][:, 0]) <= 1
+            and np.min(simulation.water_orientations_spatially_resolved["Dipole"][0][:, 0]) >= -1
+        )
+
+    def test_returns_profile_in_radial_direction_OH(self):
+        path = "./files/water_in_carbon_nanotube/m12_n12/classical"
+
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True)
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+        simulation.set_pbc_dimensions("z")
+
+        simulation.compute_water_orientation_profile(water_vector="O-H",frame_frequency=10)
 
         assert (
-            np.max(simulation.water_orientations_spatially_resolved[0][:, 0]) <= 1
-            and np.min(simulation.water_orientations_spatially_resolved[0][:, 0]) >= -1
+            np.max(simulation.water_orientations_spatially_resolved["O-H"][0][:, 0]) <= 1
+            and np.min(simulation.water_orientations_spatially_resolved["O-H"][0][:, 0]) >= -1
         )
 
 

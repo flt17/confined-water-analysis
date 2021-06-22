@@ -94,6 +94,7 @@ class Simulation:
         self.friction_coefficients = {}
         self.velocity_autocorrelation_function = {}
         self.diffusion_coefficients_via_GK = {}
+        self.water_orientations_spatially_resolved = {}
         self.free_energy_profile = free_energy.FreeEnergyProfile()
         self.tube_radius = 0
 
@@ -551,6 +552,7 @@ class Simulation:
 
     def compute_water_orientation_profile(
         self,
+        water_vector: str = "Dipole",
         start_time: int = None,
         end_time: int = None,
         frame_frequency: int = None,
@@ -558,7 +560,7 @@ class Simulation:
         """
         Compute orientation of water molecules in nanotube or on interface, direction will be taken from pbc indices.
         Arguments:
-
+            water_vector (str) : Water vector used to computed angle. Currently only "Dipole" and "O-H" implemented.
             start_time (int) : Start time for analysis (optional).
             end_time (int) : End time for analysis (optional).
             frame_frequency (int): Take every nth frame only (optional).
@@ -566,6 +568,14 @@ class Simulation:
         Returns:
 
         """
+
+        vectors_allowed = ["Dipole", "O-H"]
+
+        if water_vector not in vectors_allowed:
+            raise KeyNotFound(
+                "Only Dipole and O-H implemented as reference water vectors."
+            )
+
         # water orientation only doable for confined water system, not bulk
         if len(self.pbc_dimensions) == 3:
             raise UnphysicalValue(
@@ -595,27 +605,50 @@ class Simulation:
 
             # call function dependent on direction:
             if len(self.pbc_dimensions) == 2:
-                (
-                    orientations
-                ) = self._compute_water_orientation_profile_along_cartesian_axis(
-                    universe,
-                    start_frame,
-                    end_frame,
-                    frame_frequency,
-                )
+
+                if water_vector == "Dipole":
+                    (
+                        orientations
+                    ) = self._compute_water_orientation_profile_along_cartesian_axis(
+                        universe,
+                        start_frame,
+                        end_frame,
+                        frame_frequency,
+                    )
+
+                elif water_vector == "O-H":
+                    (
+                        orientations
+                    ) = self._compute_water_orientation_profile_along_cartesian_axis_OH(
+                        universe,
+                        start_frame,
+                        end_frame,
+                        frame_frequency,
+                    )
+
             else:
-                (
-                    orientations
-                ) = self._compute_water_orientation_profile_in_radial_direction(
-                    universe,
-                    start_frame,
-                    end_frame,
-                    frame_frequency,
-                )
+                if water_vector == "Dipole":
+                    (
+                        orientations
+                    ) = self._compute_water_orientation_profile_in_radial_direction(
+                        universe,
+                        start_frame,
+                        end_frame,
+                        frame_frequency,
+                    )
+                elif water_vector == "O-H":
+                    (
+                        orientations
+                    ) = self._compute_water_orientation_profile_in_radial_direction_OH(
+                        universe,
+                        start_frame,
+                        end_frame,
+                        frame_frequency,
+                    )
 
             orientations_sampled.append(orientations)
 
-        self.water_orientations_spatially_resolved = orientations_sampled
+        self.water_orientations_spatially_resolved[water_vector] = orientations_sampled
 
     def _compute_water_orientation_profile_along_cartesian_axis(
         self,
@@ -655,6 +688,7 @@ class Simulation:
         )
         orientations = np.zeros((number_of_water_molecules, number_of_frames))
         heights = np.zeros((number_of_water_molecules, number_of_frames))
+
         # Loop over trajectory
         for count_frames, frames in enumerate(
             tqdm(
@@ -665,7 +699,7 @@ class Simulation:
             dipole_moment_vector_all_water = np.asarray(
                 [
                     utils.get_dipole_moment_vector_in_water_molecule(
-                        position_universe.select_atoms(f"resname W{water_index+1}"),
+                        position_universe.select_atoms(f"resid {water_index+1}"),
                         self.topology,
                         self.pbc_dimensions,
                     )
@@ -686,6 +720,85 @@ class Simulation:
         orientations_over_heights = np.vstack(
             (orientations.flatten(), heights.flatten())
         ).T
+        return orientations_over_heights
+
+    def _compute_water_orientation_profile_along_cartesian_axis_OH(
+        self,
+        position_universe,
+        start_frame: int,
+        end_frame: int,
+        frame_frequency: int,
+    ):
+        """
+        Compute water orientation profile along non-periodic cartesian axis.
+        Arguments:
+            position_universe : MDAnalysis universe with trajectory.
+            start_frame (int) : Start frame for analysis.
+            end_frame (int) : End frame for analysis.
+            frame_frequency (int): Take every nth frame only.
+        Returns:
+            orientations (np.asarray) : Water orientations in the system.
+
+        """
+
+        reference_atoms = position_universe.select_atoms("not name O H")
+
+        # get number of water molecules:
+        oxygen_atoms = position_universe.select_atoms("name O")
+        number_of_water_molecules = len(oxygen_atoms)
+
+        # get vector parallel to axis for which we analyse the orientation
+        # based on pbc check what direction is investigated
+        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(
+            self.pbc_dimensions
+        )
+        not_pbc_indices = list(set(pbc_dimensions_indices) ^ set([0, 1, 2]))
+
+        # initialise mass profile array
+        number_of_frames = len(
+            position_universe.trajectory[start_frame:end_frame][::frame_frequency]
+        )
+        orientations = np.zeros((2*number_of_water_molecules, number_of_frames))
+        heights = np.zeros((2*number_of_water_molecules, number_of_frames))
+        # Loop over trajectory
+        for count_frames, frames in enumerate(
+            tqdm(
+                (position_universe.trajectory[start_frame:end_frame])[::frame_frequency]
+            )
+        ):
+            
+            # compute dipole vector for each water molecule
+            vector_oxygen_to_hydrogens = np.asarray(
+                [
+                    position_universe.select_atoms(
+                        f"name H and resid {water_index + 1}"
+                    ).positions
+                    - oxygen_atoms.select_atoms(f"resid {water_index + 1}").positions
+                    for water_index in np.arange(number_of_water_molecules)
+                ]
+            )
+            # make sure it satisfies pbc
+            vector_oxygen_to_hydrogens_pbc = (
+                utils.apply_minimum_image_convention_to_interatomic_vectors(
+                    vector_oxygen_to_hydrogens, self.topology.cell, self.pbc_dimensions
+                )
+            )
+
+            
+            # orientation angle is expressed in cos theta
+            orientations[:, count_frames] = np.concatenate(vector_oxygen_to_hydrogens_pbc[
+                :, :,not_pbc_indices[0]
+            ] / np.linalg.norm(vector_oxygen_to_hydrogens_pbc, axis=2))
+
+            heights[:, count_frames] = np.repeat(
+                oxygen_atoms.positions[:, not_pbc_indices[0]]
+                - reference_atoms.center_of_mass()[not_pbc_indices[0]],2
+            )
+
+        orientations_over_heights = np.vstack(
+            (orientations.flatten(), heights.flatten())
+        ).T
+
         return orientations_over_heights
 
     def _compute_water_orientation_profile_in_radial_direction(
@@ -725,6 +838,7 @@ class Simulation:
         orientations = np.zeros((number_of_water_molecules, number_of_frames))
 
         radial_positions = np.zeros((number_of_water_molecules, number_of_frames))
+
         # Loop over trajectory
         for count_frames, frames in enumerate(
             tqdm(
@@ -735,7 +849,7 @@ class Simulation:
             dipole_moment_vector_all_water = np.asarray(
                 [
                     utils.get_dipole_moment_vector_in_water_molecule(
-                        position_universe.select_atoms(f"resname W{water_index+1}"),
+                        position_universe.select_atoms(f"resid {water_index+1}"),
                         self.topology,
                         self.pbc_dimensions,
                     )
@@ -770,6 +884,101 @@ class Simulation:
 
             radial_positions[:, count_frames] = np.linalg.norm(
                 vectors_2D_oxygens_to_COM, axis=1
+            )
+
+        orientations_over_radial_distance = np.vstack(
+            (orientations.flatten(), radial_positions.flatten())
+        ).T
+        return orientations_over_radial_distance
+
+    def _compute_water_orientation_profile_in_radial_direction_OH(
+        self,
+        position_universe,
+        start_frame: int,
+        end_frame: int,
+        frame_frequency: int,
+    ):
+        """
+        Compute water orientation profile along radially along periodic cartesian axis.
+        Arguments:
+            position_universe : MDAnalysis universe with trajectory.
+            start_frame (int) : Start frame for analysis.
+            end_frame (int) : End frame for analysis.
+            frame_frequency (int): Take every nth frame only.
+        Returns:
+            orientations_over_radial_distance (np.asarray) : Water orientations in the system and the radial position.
+
+        """
+
+        # get number of water molecules:
+        oxygen_atoms = position_universe.select_atoms("name O")
+        number_of_water_molecules = len(oxygen_atoms)
+
+        # get vector parallel to axis for which we analyse the orientation
+        # based on pbc check what direction is investigated
+        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(
+            self.pbc_dimensions
+        )
+        not_pbc_indices = list(set(pbc_dimensions_indices) ^ set([0, 1, 2]))
+
+        # initialise mass profile array
+        number_of_frames = len(
+            position_universe.trajectory[start_frame:end_frame][::frame_frequency]
+        )
+
+        orientations = np.zeros((2*number_of_water_molecules, number_of_frames))
+
+        radial_positions = np.zeros((2*number_of_water_molecules, number_of_frames))
+
+        # Loop over trajectory
+        for count_frames, frames in enumerate(
+            tqdm(
+                (position_universe.trajectory[start_frame:end_frame])[::frame_frequency]
+            )
+        ):
+            # compute dipole vector for each water molecule
+            vector_oxygen_to_hydrogens = np.asarray(
+                [
+                    position_universe.select_atoms(
+                        f"name H and resid {water_index + 1}"
+                    ).positions
+                    - oxygen_atoms.select_atoms(f"resid {water_index + 1}").positions
+                    for water_index in np.arange(number_of_water_molecules)
+                ]
+            )
+            # make sure it satisfies pbc
+            vector_oxygen_to_hydrogens_pbc = (
+                utils.apply_minimum_image_convention_to_interatomic_vectors(
+                    vector_oxygen_to_hydrogens, self.topology.cell, self.pbc_dimensions
+                )
+            )
+
+            # compute reference coordinate, i.e. center of mass of all atoms
+            system_center_of_mass = np.ma.array(
+                position_universe.atoms.center_of_mass()
+            )
+            system_center_of_mass[pbc_dimensions_indices] = np.ma.masked
+            reference_coordinates = system_center_of_mass.compressed()
+
+            # compute radial distance from oxygen to reference
+            vectors_2D_oxygens_to_COM = (
+                reference_coordinates - oxygen_atoms.positions[:, not_pbc_indices]
+            )
+            # orientation angle is expressed in cos theta
+            orientations[:, count_frames] = (
+                np.einsum(
+                    "ij,ij->i",
+                    np.concatenate(vector_oxygen_to_hydrogens_pbc[:, :, not_pbc_indices]),
+                    np.repeat(vectors_2D_oxygens_to_COM,2,axis=0)
+                )
+                / np.linalg.norm(
+                    np.concatenate(vector_oxygen_to_hydrogens_pbc[:, :,not_pbc_indices]), axis=1
+                )
+                / np.linalg.norm(np.repeat(vectors_2D_oxygens_to_COM,2,axis=0), axis=1)
+            )
+
+            radial_positions[:, count_frames] = np.linalg.norm(
+                np.repeat(vectors_2D_oxygens_to_COM,2,axis=0), axis=1
             )
 
         orientations_over_radial_distance = np.vstack(
@@ -1147,7 +1356,11 @@ class Simulation:
         self.hydrogen_bonding = hydrogen_bonding_objects
 
     def set_up_heavy_atom_analysis(
-        self, max_heavy_atom_distance = 3.5, start_time: int = None, end_time: int = None, frame_frequency: int = None
+        self,
+        max_heavy_atom_distance=3.5,
+        start_time: int = None,
+        end_time: int = None,
+        frame_frequency: int = None,
     ):
 
         """
@@ -1196,8 +1409,8 @@ class Simulation:
                 self.time_between_frames,
                 self.get_water_contact_layer_on_interface(),
                 self.pbc_dimensions,
-                max_heavy_atom_distance
-                )
+                max_heavy_atom_distance,
+            )
 
             hydrogen_bonding_objects.append(hydrogen_bonding_analysis)
 
