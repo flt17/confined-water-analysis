@@ -81,3 +81,28 @@ class TestHydrogenBondingHeavyAtomsAnalysis:
 
         assert len(np.unique(hydrogen_bonding_analysis.heavy_atoms_dataframe["Species"])) == 2
 
+    def test_returns_pandas_dataframe_for_graphene(self):
+
+        path = "./files/water_on_graphene/"
+
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True)
+
+        simulation.set_pbc_dimensions("xy")
+
+        hydrogen_bonding_analysis = hydrogen_bonding.HydrogenBonding(
+            simulation.position_universes[0], simulation.topology
+        )
+
+        hydrogen_bonding_analysis.heavy_atoms_analysis(
+            start_frame=0,
+            end_frame=-1,
+            frame_frequency=10,
+            time_between_frames=20,
+            pbc_dimensions="xy",
+            spatial_extent_contact_layer=3.65
+        )
+
+        assert len(np.unique(hydrogen_bonding_analysis.heavy_atoms_dataframe["Species"])) == 2
+

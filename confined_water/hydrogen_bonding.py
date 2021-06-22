@@ -502,6 +502,13 @@ class HydrogenBonding:
                     )
                     >= spatial_extent_contact_layer
                 )[0]]
+            elif len(pbc_dimensions) == 2:
+                
+                # flat sheet
+                oxygen_atoms_in_contact_layer = oxygen_atoms[np.where(
+                        vector_oxygen_to_solid_COM[:, not_pbc_indices]
+                    <= spatial_extent_contact_layer)[0]]
+
 
             # now get distances between oxygens in contact layer and all heavy atoms
             vectors_oxygen_contact_heavy_atoms = (
