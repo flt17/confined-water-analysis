@@ -161,7 +161,8 @@ class HydrogenBonding:
 
             # split hydrogen positions according to respective waters
             hydrogen_positions_split = np.split(
-                hydrogen_atoms.positions[np.argsort(hydrogen_atoms.resids)], number_of_water_molecules
+                hydrogen_atoms.positions[np.argsort(hydrogen_atoms.resids)],
+                number_of_water_molecules,
             )
 
             # define all vectors from oxygens to covalently bonded hydrogens
@@ -422,8 +423,6 @@ class HydrogenBonding:
         spatial_extent_contact_layer: float,
         pbc_dimensions: str = "xyz",
         oxygen_heavy_distance: float = 3.5,
-        acceptor_hydrogen_distance: float = 2.6,
-        angle_OOH: float = 30,
     ):
         """
         Analyse Heavy atom distances and angles with hydrogens in contact layer.
@@ -436,10 +435,6 @@ class HydrogenBonding:
             pbc_dimension (str): Apply pbcs in these directions.
             oxygen_heavy_dtistance (float): Allowed distance (in angstroms) between oxygens to satisfy hydrogen
                                             bonding criterion.
-            acceptor_hydrogen_distance (float): Allowed distance (in angstroms) between acceptor and donor hydrogen
-                                                to satisfy hydrogen bonding criterion.
-            angle_OOH (float): Allowed angle (in degrees) between O-O  and donor-oxygen-hydrogen axis to satisfy
-                              hydrogen bonding criterion.
 
         Returns:
 
@@ -462,7 +457,6 @@ class HydrogenBonding:
         oxygen_atoms = self.position_universe.select_atoms(f"name O")
         solid_atoms = self.position_universe.select_atoms("not name O H")
         heavy_atoms = self.position_universe.select_atoms("not name H")
-
 
         # get number of water molecules in system
         number_of_water_molecules = len(oxygen_atoms)
@@ -496,19 +490,23 @@ class HydrogenBonding:
             # distinguish between tube and flat sheet
             if len(pbc_dimensions) == 1:
                 # tube
-                oxygen_atoms_in_contact_layer = oxygen_atoms[np.where(
-                    np.linalg.norm(
-                        vector_oxygen_to_solid_COM[:, not_pbc_indices], axis=1
-                    )
-                    >= spatial_extent_contact_layer
-                )[0]]
+                oxygen_atoms_in_contact_layer = oxygen_atoms[
+                    np.where(
+                        np.linalg.norm(
+                            vector_oxygen_to_solid_COM[:, not_pbc_indices], axis=1
+                        )
+                        >= spatial_extent_contact_layer
+                    )[0]
+                ]
             elif len(pbc_dimensions) == 2:
-                
-                # flat sheet
-                oxygen_atoms_in_contact_layer = oxygen_atoms[np.where(
-                        vector_oxygen_to_solid_COM[:, not_pbc_indices]
-                    <= spatial_extent_contact_layer)[0]]
 
+                # flat sheet
+                oxygen_atoms_in_contact_layer = oxygen_atoms[
+                    np.where(
+                        vector_oxygen_to_solid_COM[:, not_pbc_indices]
+                        <= spatial_extent_contact_layer
+                    )[0]
+                ]
 
             # now get distances between oxygens in contact layer and all heavy atoms
             vectors_oxygen_contact_heavy_atoms = (
@@ -519,7 +517,9 @@ class HydrogenBonding:
             # apply MIC for all oxygen-oxygen pairs
             vectors_contact_heavy_MIC = (
                 utils.apply_minimum_image_convention_to_interatomic_vectors(
-                    vectors_oxygen_contact_heavy_atoms, self.topology.cell, pbc_dimensions
+                    vectors_oxygen_contact_heavy_atoms,
+                    self.topology.cell,
+                    pbc_dimensions,
                 )
             )
             # get distances based on vectors
@@ -562,17 +562,23 @@ class HydrogenBonding:
 
             # now focus on computing angles
             # first find hydrogens of oxygens in contact layer
-            resids_contact = " ".join([str(i) for i in oxygen_atoms_in_contact_layer.resids])
-            hydrogens_contact = self.position_universe.select_atoms(f"name H and resid {resids_contact}")
+            resids_contact = " ".join(
+                [str(i) for i in oxygen_atoms_in_contact_layer.resids]
+            )
+            hydrogens_contact = self.position_universe.select_atoms(
+                f"name H and resid {resids_contact}"
+            )
 
             # split hydrogen positions according to respective waters
             hydrogen_positions_split = np.split(
-                hydrogens_contact.positions[np.argsort(hydrogens_contact.resids)], len(oxygen_atoms_in_contact_layer)
+                hydrogens_contact.positions[np.argsort(hydrogens_contact.resids)],
+                len(oxygen_atoms_in_contact_layer),
             )
 
             # define all vectors from oxygens to covalently bonded hydrogens
             vectors_oxygen_covalent_hydrogens_split = (
-                hydrogen_positions_split - oxygen_atoms_in_contact_layer.positions[:, np.newaxis]
+                hydrogen_positions_split
+                - oxygen_atoms_in_contact_layer.positions[:, np.newaxis]
             )
 
             # apply MIC to all vectors
@@ -610,7 +616,7 @@ class HydrogenBonding:
             ##########################
             # save all pairs to object
             ##########################
-            
+
             # heavy atom species
             heavy_atom_pairs_per_frame.heavy_atom_species = np.concatenate(
                 [
@@ -620,12 +626,33 @@ class HydrogenBonding:
             )
 
             # distance between heavy_atoms
-            heavy_atom_pairs_per_frame.heavy_atom_distances = np.concatenate(distances_contact_heavy_split)
+            heavy_atom_pairs_per_frame.heavy_atom_distances = np.concatenate(
+                distances_contact_heavy_split
+            )
 
+            # distance between hydrogens and heavy atom
+            heavy_atom_pairs_per_frame.hydrogens_heavy_atom_distances = (
+                np.concatenate(
+                    [
+                        np.linalg.norm(
+                            vectors_contact_heavy_split[contact_water][np.newaxis, :]
+                            - vectors_oxygen_covalent_hydrogens_split_MIC[
+                                contact_water
+                            ][:, np.newaxis],
+                            axis=2,
+                        ).T
+                        for contact_water in np.arange(
+                            len(oxygen_atoms_in_contact_layer)
+                        )
+                    ]
+                )
+            )
+            # heavy_atom_pairs_per_frame.hydrogen_heavy_atom_distances = vectors_contact_heavy_split
 
             # angles between acceptor oxygen, donor oxygen, and donor hydrogen
-            heavy_atom_pairs_per_frame.angles_sorted = np.concatenate(
-                [np.sort(angles_oxygen_hydrogen_heavy[i].T,axis=1)
+            heavy_atom_pairs_per_frame.angles = np.concatenate(
+                [
+                    (angles_oxygen_hydrogen_heavy[i].T)
                     for i in np.arange(len(oxygen_atoms_in_contact_layer))
                 ]
             )
@@ -635,20 +662,20 @@ class HydrogenBonding:
                 heavy_atom_pairs_per_frame.gather_information_in_numpy_array()
             )
 
-
         # convert collected arrays to pandas dataframe
         heavy_atom_dataframe = pandas.DataFrame(
             heavy_atom_data,
             columns=[
                 "Species",
-                "Distance",
-                "Min. angle",
-                "Max. angle",
+                "O-X Distance",
+                "H1-X Distance",
+                "H2-X Distance",
+                "Angle H1",
+                "Angle H2",
             ],
         )
 
         self.heavy_atoms_dataframe = heavy_atom_dataframe
-
 
 
 class DonorAcceptorPairs:
@@ -703,6 +730,7 @@ class DonorAcceptorPairs:
 
         return array
 
+
 class HeavyAtomPairs:
     """
     Gather heavy atom pairs in np.array format for one frame
@@ -729,14 +757,15 @@ class HeavyAtomPairs:
         Returns:
             array (np.array): contains all information in stacked array.
         """
-
+        
         array = np.vstack(
             [
                 self.heavy_atom_species,
                 self.heavy_atom_distances,
-                self.angles_sorted[:,0],
-                self.angles_sorted[:,1],
-
+                self.hydrogens_heavy_atom_distances[:,0],
+                self.hydrogens_heavy_atom_distances[:,1],
+                self.angles[:, 0],
+                self.angles[:, 1],
             ]
         ).T
 
