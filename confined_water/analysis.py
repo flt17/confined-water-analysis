@@ -708,7 +708,7 @@ class Simulation:
             )
 
             # orientation angle is expressed in cos theta
-            orientations[:, count_frames] = dipole_moment_vector_all_water[
+            orientations[:, count_frames] = -dipole_moment_vector_all_water[
                 :, not_pbc_indices[0]
             ] / np.linalg.norm(dipole_moment_vector_all_water, axis=1)
 
@@ -745,6 +745,7 @@ class Simulation:
 
         # get number of water molecules:
         oxygen_atoms = position_universe.select_atoms("name O")
+        hydrogen_atoms = position_universe.select_atoms("name H")
         number_of_water_molecules = len(oxygen_atoms)
 
         # get vector parallel to axis for which we analyse the orientation
@@ -770,8 +771,8 @@ class Simulation:
             # compute dipole vector for each water molecule
             vector_oxygen_to_hydrogens = np.asarray(
                 [
-                    position_universe.select_atoms(
-                        f"name H and resid {water_index + 1}"
+                    hydrogen_atoms.select_atoms(
+                        f"resid {water_index + 1}"
                     ).positions
                     - oxygen_atoms.select_atoms(f"resid {water_index + 1}").positions
                     for water_index in np.arange(number_of_water_molecules)
@@ -786,7 +787,7 @@ class Simulation:
 
             
             # orientation angle is expressed in cos theta
-            orientations[:, count_frames] = np.concatenate(vector_oxygen_to_hydrogens_pbc[
+            orientations[:, count_frames] = np.concatenate(-vector_oxygen_to_hydrogens_pbc[
                 :, :,not_pbc_indices[0]
             ] / np.linalg.norm(vector_oxygen_to_hydrogens_pbc, axis=2))
 
@@ -912,6 +913,7 @@ class Simulation:
 
         # get number of water molecules:
         oxygen_atoms = position_universe.select_atoms("name O")
+        hydrogen_atoms = position_universe.select_atoms("name H")
         number_of_water_molecules = len(oxygen_atoms)
 
         # get vector parallel to axis for which we analyse the orientation
@@ -939,8 +941,8 @@ class Simulation:
             # compute dipole vector for each water molecule
             vector_oxygen_to_hydrogens = np.asarray(
                 [
-                    position_universe.select_atoms(
-                        f"name H and resid {water_index + 1}"
+                    hydrogen_atoms.select_atoms(
+                        f"resid {water_index + 1}"
                     ).positions
                     - oxygen_atoms.select_atoms(f"resid {water_index + 1}").positions
                     for water_index in np.arange(number_of_water_molecules)
