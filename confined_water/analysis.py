@@ -650,6 +650,7 @@ class Simulation:
 
         self.water_orientations_spatially_resolved[water_vector] = orientations_sampled
 
+
     def _compute_water_orientation_profile_along_cartesian_axis(
         self,
         position_universe,
@@ -2487,3 +2488,47 @@ class Simulation:
             plot_replica,
             self.tube_radius,
         )
+
+
+    def compute_water_reorientational_relaxation_time(
+        self,
+        regime: str = "Contact",
+        start_time: int = None,
+        end_time: int = None,
+        frame_frequency: int = None,
+    ):
+
+        """
+        Compute the average reorientational relaxation time of water either in the contact layer of bulk.
+        The definition of the reorientational relaxation time is taken from Angew.Chem. Int. Ed. 2020, 59,18578–18585.
+        Arguments:
+            regime (str) : Compute in bulk or contact layer.
+            start_time (int) : Start time for analysis (optional).
+            end_time (int) : End time for analysis (optional).
+            frame_frequency (int): Take every nth frame only (optional).
+        """
+
+        # get information about sampling
+        start_frame, end_frame, frame_frequency = self._get_sampling_frames(
+            start_time, end_time, frame_frequency
+        )
+
+        # determine which position universe are to be used in case of PIMD
+        # Thermodynamic properties are based on trajectory of replica
+        tmp_position_universes = (
+            self.position_universes
+            if len(self.position_universes) == 1
+            else self.position_universes[1::]
+        )
+
+        # define allowed regimes
+        allowed_regimes = ["Contact", "Bulk", "Full"]
+        # raise error if other tha allowed regimes are given
+        if regime not in  allowed_regimes:
+            raise KeyNotFound(
+                f"Defined regime is not allowed. Only keywords 'Contact', 'Bulk', and 'Full' are allowed."
+            )
+
+
+
+

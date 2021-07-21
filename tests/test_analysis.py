@@ -510,3 +510,19 @@ class TestSimulation_GetWaterContactLayerOnInterface:
         spatial_expansion_contact_layer = simulation.get_water_contact_layer_on_interface()
 
         assert spatial_expansion_contact_layer > 0
+
+
+class TestSimulation_ComputeWaterReorientationalRelaxationTime:
+    def test_returns_error_for_not_allowed_regime(self):
+        path = "./files/water_in_carbon_nanotube/m12_n12/classical"
+
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True)
+
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+
+        with pytest.raises(analysis.KeyNotFound):
+            simulation.compute_water_reorientational_relaxation_time(regime="Random")
