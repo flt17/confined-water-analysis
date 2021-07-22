@@ -566,3 +566,86 @@ class TestSimulation_ComputeWaterReorientationalRelaxationTime:
         simulation.compute_water_reorientational_relaxation_time(regime="Bulk", correlation_time=1000, number_of_blocks=1)
         
         assert simulation.reorientational_relaxation_time.get('reg: Bulk; ct: 1000')
+
+
+    def test_returns_reorientational_relaxation_time_for_graphene_in_contact_layer(self):
+        path = "./files/water_on_graphene"
+
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True)
+
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+
+        simulation.set_pbc_dimensions("xy")
+
+        simulation.compute_density_profile(["O", "H"], direction="z")
+
+
+        simulation.compute_water_reorientational_relaxation_time(regime="Contact", correlation_time=1000, number_of_blocks=1)
+        
+        assert simulation.reorientational_relaxation_time.get('reg: Contact; ct: 1000')
+
+
+    def test_returns_reorientational_relaxation_time_for_graphene_in_bulk(self):
+        path = "./files/water_on_graphene"
+
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True)
+
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+
+        simulation.set_pbc_dimensions("xy")
+
+        simulation.compute_density_profile(["O", "H"], direction="z")
+
+
+        simulation.compute_water_reorientational_relaxation_time(regime="Bulk", correlation_time=1000, number_of_blocks=1)
+
+        assert simulation.reorientational_relaxation_time.get('reg: Bulk; ct: 1000')
+
+
+    def test_returns_reorientational_relaxation_time_for_graphene_full(self):
+        path = "./files/water_on_graphene"
+
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True)
+
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+
+        simulation.set_pbc_dimensions("xy")
+
+        simulation.compute_density_profile(["O", "H"], direction="z")
+
+
+        simulation.compute_water_reorientational_relaxation_time(regime="Full", correlation_time=1000, number_of_blocks=1)
+        
+        assert simulation.reorientational_relaxation_time.get('reg: Full; ct: 1000')
+
+
+    def test_returns_reorientational_relaxation_time_for_bulk_water_full(self):
+        path = "./files/bulk_water/classical"
+
+        topology_name = "revPBE0-D3-w64-T300K-1bar"
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True, topology_file_name=topology_name)
+
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+
+        simulation.compute_water_reorientational_relaxation_time(regime="Full", correlation_time=1000, number_of_blocks=1)
+        
+        breakpoint()
+        assert simulation.reorientational_relaxation_time.get('reg: Full; ct: 1000')
+
+

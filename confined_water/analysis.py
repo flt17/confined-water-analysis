@@ -2552,9 +2552,7 @@ class Simulation:
         # allocate array for number of samples per correlation frame
         number_of_samples_correlated = np.zeros(number_of_correlation_frames)
         # allocate array for blocks for statistical error analysis
-        ACF_OH_angle_block = np.zeros(
-            (number_of_blocks, number_of_correlation_frames)
-        )
+        ACF_OH_angle_block = np.zeros((number_of_blocks, number_of_correlation_frames))
         # check if correlation time can be obtained with current trajectory:
         number_of_samples = len(
             tmp_position_universe.trajectory[start_frame:end_frame][::frame_frequency]
@@ -2597,12 +2595,29 @@ class Simulation:
                 )
 
             elif len(self.pbc_dimensions) == 2:
-                pass
+                (
+                    OH_vectors,
+                    distance_to_surface,
+                ) = self._get_OH_vectors_for_distinct_regime_along_cartesian_axis(
+                    regime=regime,
+                    position_universe=tmp_position_universe,
+                    start_frame=start_frame,
+                    end_frame=end_frame,
+                    frame_frequency=frame_frequency,
+                )
+        else:
+            OH_vectors = self._get_OH_vectors_full(position_universe=tmp_position_universe,
+                    start_frame=start_frame,
+                    end_frame=end_frame,
+                    frame_frequency=frame_frequency)
+            # dummy variables
+            # not ideal but works
+            spatial_extent_contact_layer=0
+            distance_to_surface=np.zeros((OH_vectors.shape[0],OH_vectors.shape[1]))
+
 
         ########################################
         ########################################
-
-        inside_regime = np.arange(OH_vectors.shape[1])
 
         # Loop over OH vectors in time
         for frame in tqdm(np.arange(OH_vectors.shape[0])):
@@ -2621,15 +2636,10 @@ class Simulation:
             # now the fun bit:
             # remove entries from the vectors which are not within the regime
             # define if radial positions need be larger or smaller than the contact layer value
-            if regime == "Bulk":
-                inside_regime = np.where(
-                    distance_to_surface[frame] < spatial_extent_contact_layer
-                )[0]
 
-            elif regime == "Contact":
-                inside_regime = np.where(
-                    distance_to_surface[frame] >= spatial_extent_contact_layer
-                )[0]
+            inside_regime = self._assign_molecules_to_regime(
+                regime, distance_to_surface[frame], spatial_extent_contact_layer
+            )
 
             # compute autocorrelation for angles
             ACF_per_frame = np.mean(
@@ -2655,9 +2665,7 @@ class Simulation:
             )
 
             # add to ensemble average
-            ACF_OH_angle[
-                0:number_of_frames_correlated
-            ] += ACF_per_frame
+            ACF_OH_angle[0:number_of_frames_correlated] += ACF_per_frame
 
             # to get insight on the statistical error we compute block averages
             ACF_OH_angle_block[
@@ -2687,12 +2695,8 @@ class Simulation:
                     )
 
                 # average current block
-                ACF_OH_angle_block[
-                    index_current_block_used, :
-                ] = (
-                    ACF_OH_angle_block[
-                        index_current_block_used, :
-                    ]
+                ACF_OH_angle_block[index_current_block_used, :] = (
+                    ACF_OH_angle_block[index_current_block_used, :]
                     / number_of_samples_correlated_per_block
                 )
 
@@ -2705,32 +2709,24 @@ class Simulation:
                 index_current_block_used += 1
 
         # get average autocorrelation
-        average_ACF_OH_angle = (
-            ACF_OH_angle / number_of_samples_correlated
-        )
+        average_ACF_OH_angle = ACF_OH_angle / number_of_samples_correlated
 
         # compute statistical error based on block averags
-        std_ACF_OH_angle = np.std(
-            ACF_OH_angle_block, axis=0
-        )
+        std_ACF_OH_angle = np.std(ACF_OH_angle_block, axis=0)
 
         # compute relaxation time from obtained autocorrelation of OH angles by integrating
-        relaxation_time = (
-                scipy.integrate.cumtrapz(
-                    average_ACF_OH_angle,
-                    dx=frame_frequency * self.time_between_frames,
-                    initial=0.0,
-                )
-            )
+        relaxation_time = scipy.integrate.cumtrapz(
+            average_ACF_OH_angle,
+            dx=frame_frequency * self.time_between_frames,
+            initial=0.0,
+        )
 
         # compute relaxation time for each block
-        relaxation_time_block = (
-            scipy.integrate.cumtrapz(
-                ACF_OH_angle_block,
-                dx=frame_frequency * self.time_between_frames,
-                axis=1,
-                initial=0.0,
-            )
+        relaxation_time_block = scipy.integrate.cumtrapz(
+            ACF_OH_angle_block,
+            dx=frame_frequency * self.time_between_frames,
+            axis=1,
+            initial=0.0,
         )
 
         # based on these blocks compute std
@@ -2754,6 +2750,45 @@ class Simulation:
             std_relaxation_time,
         ]
 
+    def _assign_molecules_to_regime(
+        self, regime, distance_to_surface, spatial_extent_contact_layer
+    ):
+        """
+        Returns a vector of indices of water molecules which are within the regime requested.
+        This is done based on periodic directions and the spatial extent of the contact layer.
+        Arguments:
+            regime (str) : Compute in bulk or contact layer.
+            distance_to_surface: Array with all distances to surface at a given frame of all water molecules.
+            spatial_extent_contact_layer (float) : Separates contact layer from bulk region.
+        """
+
+        # first exclude Full case, i.e. all molecules are valid
+        if regime == "Full":
+            return np.arange(distance_to_surface.shape[0])
+
+        else:
+            # if nanotube
+            if len(self.pbc_dimensions) == 1:
+                if regime == "Bulk":
+                    return np.where(distance_to_surface < spatial_extent_contact_layer)[
+                        0
+                    ]
+
+                else:
+                    return np.where(
+                        distance_to_surface >= spatial_extent_contact_layer
+                    )[0]
+            # if flat sheet
+            elif len(self.pbc_dimensions) == 2:
+                if regime == "Bulk":
+                    return np.where(distance_to_surface > spatial_extent_contact_layer)[
+                        0
+                    ]
+
+                else:
+                    return np.where(
+                        distance_to_surface <= spatial_extent_contact_layer
+                    )[0]
 
     def _get_OH_vectors_for_distinct_regime_in_radial_direction(
         self,
@@ -2765,7 +2800,7 @@ class Simulation:
     ):
 
         """
-        Compute OH vectors based on position universe for a specific regime (bulk/contact)
+        Compute OH vectors based on position universe for a specific regime (bulk/contact) in nanotube.
         Arguments:
             regime (str) : Compute in bulk or contact layer.
             position_universe : Position universe for respective trajectory.
@@ -2777,7 +2812,6 @@ class Simulation:
         # get number of water molecules:
         oxygen_atoms = position_universe.select_atoms("name O")
         hydrogen_atoms = position_universe.select_atoms("name H")
-        solid_atoms = position_universe.select_atoms("not name O H")
         number_of_water_molecules = len(oxygen_atoms)
         number_of_frames = len(
             position_universe.trajectory[start_frame:end_frame][::frame_frequency]
@@ -2831,5 +2865,126 @@ class Simulation:
                 vectors_2D_oxygens_to_COM, axis=1
             )
 
-
         return vector_array, radial_positions
+
+    def _get_OH_vectors_for_distinct_regime_along_cartesian_axis(
+        self,
+        regime,
+        position_universe,
+        start_frame,
+        end_frame,
+        frame_frequency,
+    ):
+
+        """
+        Compute OH vectors based on position universe for a specific regime (bulk/contact) on flat surfaces
+        Arguments:
+            regime (str) : Compute in bulk or contact layer.
+            position_universe : Position universe for respective trajectory.
+            start_frame (int) : Start frame for analysis.
+            end_time (int) : End frame for analysis.
+            frame_frequency (int): Take every nth frame only.
+        """
+
+        # get number of water molecules:
+        oxygen_atoms = position_universe.select_atoms("name O")
+        hydrogen_atoms = position_universe.select_atoms("name H")
+        solid_atoms = position_universe.select_atoms("not name O H")
+        number_of_water_molecules = len(oxygen_atoms)
+        number_of_frames = len(
+            position_universe.trajectory[start_frame:end_frame][::frame_frequency]
+        )
+
+        # translate pbc directions in indices
+        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(
+            self.pbc_dimensions
+        )
+        not_pbc_indices = list(set(pbc_dimensions_indices) ^ set([0, 1, 2]))
+
+        # allocate arrays
+        vector_array = np.zeros((number_of_frames, number_of_water_molecules, 2, 3))
+        heights = np.zeros((number_of_frames, number_of_water_molecules))
+
+        # Loop over trajectory
+        for count_frames, frames in enumerate(
+            tqdm(
+                (position_universe.trajectory[start_frame:end_frame])[::frame_frequency]
+            )
+        ):
+
+            # compute dipole vector for each water molecule
+            vector_oxygen_to_hydrogens = np.asarray(
+                [
+                    hydrogen_atoms.select_atoms(f"resid {water_index + 1}").positions
+                    - oxygen_atoms.select_atoms(f"resid {water_index + 1}").positions
+                    for water_index in np.arange(number_of_water_molecules)
+                ]
+            )
+            # make sure it satisfies pbc
+            vector_array[
+                count_frames
+            ] = utils.apply_minimum_image_convention_to_interatomic_vectors(
+                vector_oxygen_to_hydrogens, self.topology.cell, self.pbc_dimensions
+            )
+
+            heights[count_frames, :] = (
+                oxygen_atoms.positions[:, not_pbc_indices[0]]
+                - solid_atoms.center_of_mass()[not_pbc_indices[0]]
+            )
+
+        return vector_array, heights
+
+    def _get_OH_vectors_full(
+        self,
+        position_universe,
+        start_frame,
+        end_frame,
+        frame_frequency,
+    ):
+
+        """
+        Compute OH vectors based on position universe for a specific regime (bulk/contact) on flat surfaces
+        Arguments:
+            position_universe : Position universe for respective trajectory.
+            start_frame (int) : Start frame for analysis.
+            end_time (int) : End frame for analysis.
+            frame_frequency (int): Take every nth frame only.
+        """
+
+        # get number of water molecules:
+        oxygen_atoms = position_universe.select_atoms("name O")
+        hydrogen_atoms = position_universe.select_atoms("name H")
+        number_of_water_molecules = len(oxygen_atoms)
+        number_of_frames = len(
+            position_universe.trajectory[start_frame:end_frame][::frame_frequency]
+        )
+
+
+        # allocate arrays
+        vector_array = np.zeros((number_of_frames, number_of_water_molecules, 2, 3))
+        
+
+        # Loop over trajectory
+        for count_frames, frames in enumerate(
+            tqdm(
+                (position_universe.trajectory[start_frame:end_frame])[::frame_frequency]
+            )
+        ):
+
+            # compute dipole vector for each water molecule
+            vector_oxygen_to_hydrogens = np.asarray(
+                [
+                    hydrogen_atoms.select_atoms(f"resid {water_index + 1}").positions
+                    - oxygen_atoms.select_atoms(f"resid {water_index + 1}").positions
+                    for water_index in np.arange(number_of_water_molecules)
+                ]
+            )
+            # make sure it satisfies pbc
+            vector_array[
+                count_frames
+            ] = utils.apply_minimum_image_convention_to_interatomic_vectors(
+                vector_oxygen_to_hydrogens, self.topology.cell, self.pbc_dimensions
+            )
+
+
+        return vector_array
