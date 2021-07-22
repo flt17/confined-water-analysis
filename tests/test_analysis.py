@@ -546,3 +546,23 @@ class TestSimulation_ComputeWaterReorientationalRelaxationTime:
         simulation.compute_water_reorientational_relaxation_time(regime="Contact", correlation_time=1000, number_of_blocks=1)
         
         assert simulation.reorientational_relaxation_time.get('reg: Contact; ct: 1000')
+
+    def test_returns_reorientational_relaxation_time_for_nanotube_in_bulk_regime(self):
+        path = "./files/water_in_carbon_nanotube/m12_n12/classical"
+
+        simulation = analysis.Simulation(path)
+
+        simulation.read_in_simulation_data(read_positions=True)
+
+        simulation.set_sampling_times(
+            start_time=0, end_time=-1, frame_frequency=1, time_between_frames=20
+        )
+
+        simulation.set_pbc_dimensions("z")
+
+        simulation.compute_density_profile(["O", "H"], direction="radial z")
+
+
+        simulation.compute_water_reorientational_relaxation_time(regime="Bulk", correlation_time=1000, number_of_blocks=1)
+        
+        assert simulation.reorientational_relaxation_time.get('reg: Bulk; ct: 1000')
