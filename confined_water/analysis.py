@@ -2372,11 +2372,19 @@ class Simulation:
                 ),
             )
 
+            # get density at found peaks
+            density_at_peaks = self.density_profiles[string_density_dict][1][
+                peak_indices
+            ]
+
+            # define which peak to take for contact layer
+            index_to_take = np.where(density_at_peaks >= 0.1)[0][-1]
+
             # we return now only the second minimum find expressed in the bins of the profile, i.e. in angstroms
             # the second minima is chosen instead of the first, as this is not zero and represents the "end" of
             # the contact layer. However, here we have to take the second last element, as the solid is located
             # at larger distances.
-            return self.density_profiles[string_density_dict][0][peak_indices[-2]]
+            return self.density_profiles[string_density_dict][0][peak_indices[index_to_take]]
 
     def compute_free_energy_profile(
         self,
