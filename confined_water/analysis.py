@@ -2152,6 +2152,8 @@ class Simulation:
             * frame_frequency,
             average_autocorrelation_total_summed_forces,
             std_autocorrelation_total_summed_forces,
+            autocorrelation_total_summed_forces_block
+
         ]
 
         self.friction_coefficients[string_for_dict] = [
@@ -2160,6 +2162,7 @@ class Simulation:
             * frame_frequency,
             average_friction_coefficient,
             std_friction_coefficient,
+            average_friction_coefficient_block,
         ]
 
     def _get_surface_area_of_solid_phase(
