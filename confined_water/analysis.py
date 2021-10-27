@@ -2565,8 +2565,8 @@ class Simulation:
         ):
 
             # wrapping is important now
-            uni.atoms.pack_into_box(
-                box=simulation.topology.get_cell_lengths_and_angles(), inplace=True
+            tmp_position_universe.atoms.pack_into_box(
+                box=self.topology.get_cell_lengths_and_angles(), inplace=True
             )
 
             # get vectors between each oxygen and all solid atoms
