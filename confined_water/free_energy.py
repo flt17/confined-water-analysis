@@ -668,7 +668,7 @@ def _compute_distribution_for_system_with_two_periodic_directions(
             )
 
         # get minimum distances based on vectors
-        min_distances_liquid_to_solid[count_frames] = np.min(
+        min_distances_liquid_to_solid = np.min(
                 np.linalg.norm(vectors_liquid_to_solid_MIC, axis=2), axis=1
             )
 
