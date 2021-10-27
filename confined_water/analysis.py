@@ -2603,7 +2603,7 @@ class Simulation:
         histogram_distances_normalised = histogram_distances / np.sum(
             histogram_distances
         )
-        distances_bin_centers = (bins[1::] + bins[0:-1]) * 0.5
+        distances_bin_centers = (distances[1::] + distances[0:-1]) * 0.5
 
         self.distribution_shorted_OX = np.asarray(
             [distances_bin_centers, histogram_distances_normalised]
