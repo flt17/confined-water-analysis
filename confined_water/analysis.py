@@ -2152,8 +2152,7 @@ class Simulation:
             * frame_frequency,
             average_autocorrelation_total_summed_forces,
             std_autocorrelation_total_summed_forces,
-            autocorrelation_total_summed_forces_block
-
+            autocorrelation_total_summed_forces_block,
         ]
 
         self.friction_coefficients[string_for_dict] = [
@@ -2387,7 +2386,9 @@ class Simulation:
             # the second minima is chosen instead of the first, as this is not zero and represents the "end" of
             # the contact layer. However, here we have to take the second last element, as the solid is located
             # at larger distances.
-            return self.density_profiles[string_density_dict][0][peak_indices[index_to_take]]
+            return self.density_profiles[string_density_dict][0][
+                peak_indices[index_to_take]
+            ]
 
     def compute_free_energy_profile(
         self,
@@ -2505,6 +2506,109 @@ class Simulation:
             self.tube_radius,
         )
 
+    def compute_distribution_shortest_O_X_distance(
+        self,
+        bin_width: float = 0.1,
+        start_time: int = None,
+        end_time: int = None,
+        frame_frequency: int = None,
+    ):
+        """
+        Compute the distribution of the shortest distances between oxygen atoms and the solid atoms. This instantaneous treatment
+        allows to properly determine the contact layer irrespective of the breathing modes of the solid.
+        Arguments:
+            bin_width (float) : Bin width for histogram, default 0.1 A.
+            start_time (int) : Start time for analysis (optional).
+            end_time (int) : End time for analysis (optional).
+            frame_frequency (int): Take every nth frame only (optional).
+        """
+
+        # get information about sampling
+        start_frame, end_frame, frame_frequency = self._get_sampling_frames(
+            start_time, end_time, frame_frequency
+        )
+
+        # determine which position universe are to be used in case of PIMD
+        # Thermodynamic properties are based on trajectory of replica
+        tmp_position_universe = (
+            self.position_universes
+            if len(self.position_universes) == 1
+            else self.position_universes[1::]
+        )
+
+        # get indices for pbc
+        pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(
+            self.pbc_dimensions
+        )
+
+        # define atom groups and array for saving distances
+        oxygen_atoms = tmp_position_universe.select_atoms("name O")
+        solid_atoms = tmp_position_universe.select_atoms("name C B N")
+        min_distances_oxygens_to_solid = np.zeros(
+            (
+                len(
+                    tmp_position_universe.trajectory[start_frame:end_frame][
+                        ::frame_frequency
+                    ]
+                ),
+                len(oxygen_atoms),
+            )
+        )
+
+        # loop over trajectory
+        for count_frames, frames in enumerate(
+            tqdm(
+                (tmp_position_universe.trajectory[start_frame:end_frame])[
+                    ::frame_frequency
+                ]
+            )
+        ):
+
+            # wrapping is important now
+            uni.atoms.pack_into_box(
+                box=simulation.topology.get_cell_lengths_and_angles(), inplace=True
+            )
+
+            # get vectors between each oxygen and all solid atoms
+            vectors_oxygens_to_solid = (
+                solid_atoms.positions[np.newaxis, :]
+                - oxygen_atoms.positions[:, np.newaxis]
+            )
+
+            # get vectors between each oxygen and all solid atoms
+            vectors_oxygens_to_solid = (
+                solid_atoms.positions[np.newaxis, :]
+                - oxygen_atoms.positions[:, np.newaxis]
+            )
+
+            # apply MIC for all oxygen-oxygen pairs
+            vectors_oxygens_to_solid_MIC = (
+                utils.apply_minimum_image_convention_to_interatomic_vectors(
+                    vectors_oxygens_to_solid, self.topology.cell, pbc_dimensions
+                )
+            )
+
+            # get minimum distances based on vectors
+            min_distances_oxygens_to_solid[count_frames] = np.min(
+                np.linalg.norm(vectors_oxygens_to_solid_MIC, axis=2), axis=1
+            )
+
+        # now normalise and compute histogram
+        range_bins = self.topology.cell.cellpar()[
+            np.min(global_variables.DIMENSION_DICTIONARY.get("z"))
+        ]
+        histogram_distances, distances = np.histogram(
+            min_distances_oxygens_to_solid, bins=np.arange(0, bin_width, range_bins)
+        )
+        histogram_distances_normalised = histogram_distances / np.sum(
+            histogram_distances
+        )
+        distances_bin_centers = (bins[1::] + bins[0:-1]) * 0.5
+
+        self.distribution_shorted_OX = np.asarray(
+            [distances_bin_centers, histogram_distances_normalised]
+        )
+
     def compute_water_reorientational_relaxation_time(
         self,
         regime: str = "Contact",
@@ -2617,15 +2721,16 @@ class Simulation:
                     frame_frequency=frame_frequency,
                 )
         else:
-            OH_vectors = self._get_OH_vectors_full(position_universe=tmp_position_universe,
-                    start_frame=start_frame,
-                    end_frame=end_frame,
-                    frame_frequency=frame_frequency)
+            OH_vectors = self._get_OH_vectors_full(
+                position_universe=tmp_position_universe,
+                start_frame=start_frame,
+                end_frame=end_frame,
+                frame_frequency=frame_frequency,
+            )
             # dummy variables
             # not ideal but works
-            spatial_extent_contact_layer=0
-            distance_to_surface=np.zeros((OH_vectors.shape[0],OH_vectors.shape[1]))
-
+            spatial_extent_contact_layer = 0
+            distance_to_surface = np.zeros((OH_vectors.shape[0], OH_vectors.shape[1]))
 
         ########################################
         ########################################
@@ -2970,10 +3075,8 @@ class Simulation:
             position_universe.trajectory[start_frame:end_frame][::frame_frequency]
         )
 
-
         # allocate arrays
         vector_array = np.zeros((number_of_frames, number_of_water_molecules, 2, 3))
-        
 
         # Loop over trajectory
         for count_frames, frames in enumerate(
@@ -2996,6 +3099,5 @@ class Simulation:
             ] = utils.apply_minimum_image_convention_to_interatomic_vectors(
                 vector_oxygen_to_hydrogens, self.topology.cell, self.pbc_dimensions
             )
-
 
         return vector_array
