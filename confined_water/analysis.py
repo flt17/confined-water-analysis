@@ -2584,7 +2584,7 @@ class Simulation:
             # apply MIC for all oxygen-oxygen pairs
             vectors_oxygens_to_solid_MIC = (
                 utils.apply_minimum_image_convention_to_interatomic_vectors(
-                    vectors_oxygens_to_solid, self.topology.cell, pbc_dimensions
+                    vectors_oxygens_to_solid, self.topology.cell, self.pbc_dimensions
                 )
             )
 
