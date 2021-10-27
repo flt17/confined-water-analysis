@@ -2534,7 +2534,7 @@ class Simulation:
             self.position_universes
             if len(self.position_universes) == 1
             else self.position_universes[1::]
-        )
+        )[0]
 
         # get indices for pbc
         pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(
