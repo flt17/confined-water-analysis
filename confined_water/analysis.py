@@ -2401,11 +2401,11 @@ class Simulation:
 
 
         # if shortest OX distance distribution is not computed raise error
-        if not self.distribution_shortest_OX:
-                raise KeyNotFound(
-                    f"Couldn't find the distribution of the shortest OX distance."
-                    f"Make sure you compute the profile first for oxygens."
-                )
+        # if not self.distribution_shortest_OX:
+        #         raise KeyNotFound(
+        #             f"Couldn't find the distribution of the shortest OX distance."
+        #             f"Make sure you compute the profile first for oxygens."
+        #         )
 
         # let's start by smoothing the density profile
         smooth_density_profile = scipy.signal.savgol_filter(
