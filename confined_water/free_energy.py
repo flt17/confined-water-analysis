@@ -639,17 +639,44 @@ def _compute_distribution_for_system_with_two_periodic_directions(
         universe.atoms.pack_into_box(box=topology.get_cell_lengths_and_angles(), inplace=True)
 
         # define center of mass of solid now
-        solid_COM = solid_atoms.center_of_mass()
+        # solid_COM = solid_atoms.center_of_mass()
 
         # now compute distance from liquid atoms perpendicular to the center of mass of the solid
-        perpendicular_distance_liquid_to_solid = (
-            liquid_atoms.positions[:, not_pbc_indices] - solid_COM[not_pbc_indices]
-        ).flatten()
+        # perpendicular_distance_liquid_to_solid = (
+        #     liquid_atoms.positions[:, not_pbc_indices] - solid_COM[not_pbc_indices]
+        # ).flatten()
 
-        # only choose those atoms which are within contact layer only 2D
+        # # only choose those atoms which are within contact layer only 2D
+        # liquid_atoms_in_contact_positions = liquid_atoms[
+        #     np.where(perpendicular_distance_liquid_to_solid <= spatial_extent_contact_layer)
+        # ].positions[:, pbc_indices]
+
+        # now we have to check which atoms are in the contact layer based on the shortest OX distance
+        # for this we need to find the closest solid atom for each liquid atom
+
+        # get vectors between each liquid atom and all solid atoms
+        vectors_liquid_to_solid = (
+                solid_atoms.positions[np.newaxis, :]
+                - liquid_atoms.positions[:, np.newaxis]
+            )
+
+        # apply MIC for all oxygen-oxygen pairs
+        vectors_liquid_to_solid_MIC = (
+            utils.apply_minimum_image_convention_to_interatomic_vectors(
+                    vectors_liquid_to_solid, topology.cell, "xy"
+                )
+            )
+
+        # get minimum distances based on vectors
+        min_distances_liquid_to_solid[count_frames] = np.min(
+                np.linalg.norm(vectors_liquid_to_solid_MIC, axis=2), axis=1
+            )
+
         liquid_atoms_in_contact_positions = liquid_atoms[
-            np.where(perpendicular_distance_liquid_to_solid <= spatial_extent_contact_layer)
+            np.where(min_distances_liquid_to_solid <= spatial_extent_contact_layer)
         ].positions[:, pbc_indices]
+
+
 
         # save liquid
         liquid_contact_coord1 = np.append(

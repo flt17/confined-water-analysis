@@ -2475,7 +2475,9 @@ class Simulation:
         )
 
         # compute spatial extent of contact layer
-        spatial_extent_contact_layer = self.get_water_contact_layer_on_interface()
+        # spatial_extent_contact_layer = self.get_water_contact_layer_on_interface()
+        spatial_extent_contact_layer = self.get_water_contact_layer_on_interface_from_shortest_OX() # now from shortest OX 
+
 
         # compute average tube radius if tube
         if len(pbc_dimensions_indices) == 1:
@@ -2607,12 +2609,6 @@ class Simulation:
             # wrapping is important now
             tmp_position_universe.atoms.pack_into_box(
                 box=self.topology.get_cell_lengths_and_angles(), inplace=True
-            )
-
-            # get vectors between each oxygen and all solid atoms
-            vectors_oxygens_to_solid = (
-                solid_atoms.positions[np.newaxis, :]
-                - oxygen_atoms.positions[:, np.newaxis]
             )
 
             # get vectors between each oxygen and all solid atoms
