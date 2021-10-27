@@ -2390,6 +2390,46 @@ class Simulation:
                 peak_indices[index_to_take]
             ]
 
+    def get_water_contact_layer_on_interface_from_shortest_OX(self):
+        """
+        Compute spatial extension of water contact layer on solid interface.
+        Important: This function requires a previous evaluation of the shortest OX distances.
+        Arguments:
+        Returns:
+            spatial expansion of the contact layer in angstroms
+        """
+
+
+        # if shortest OX distance distribution is not computed raise error
+        if not self.distribution_shortest_OX:
+                raise KeyNotFound(
+                    f"Couldn't find the distribution of the shortest OX distance."
+                    f"Make sure you compute the profile first for oxygens."
+                )
+
+        # let's start by smoothing the density profile
+        smooth_density_profile = scipy.signal.savgol_filter(
+                self.distribution_shortest_OX[1], 11, 5
+            )
+
+        # based on smooth profile, find peaks
+        # we multiply the profile by -1 to find minima instead of peaks
+        # Use negative to get minima as 'peaks'
+        peak_indices, __ = scipy.signal.find_peaks(
+                -smooth_density_profile,
+                distance=2
+                / (
+                    self.distribution_shortest_OX[0][1]
+                    - self.distribution_shortest_OX[0][0]
+                ),
+            )
+
+        # we return now only the second minimum find expressed in the bins of the profile, i.e. in angstroms
+        # the second minima is chosen instead of the first, as this is not zero and represents the "end" of
+        # the contact layer.
+ 
+        return self.distribution_shortest_OX[0][peak_indices[1]]
+
     def compute_free_energy_profile(
         self,
         tube_length_in_unit_cells: int = None,
