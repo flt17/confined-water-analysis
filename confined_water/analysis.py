@@ -2594,11 +2594,11 @@ class Simulation:
             )
 
         # now normalise and compute histogram
-        range_bins = self.topology.cell.cellpar()[
-            np.min(global_variables.DIMENSION_DICTIONARY.get(self.pbc_dimensions))
-        ]
+        not_pbc_indices = list(set(pbc_dimensions_indices) ^ set([0, 1, 2]))
+        range_bins = np.min([self.topology.cell.cellpar()[not_pbc_indices] ]       )
+
         histogram_distances, distances = np.histogram(
-            min_distances_oxygens_to_solid, bins=np.arange(0, bin_width, range_bins)
+            min_distances_oxygens_to_solid, bins=np.arange(0, range_bins,bin_width)
         )
         histogram_distances_normalised = histogram_distances / np.sum(
             histogram_distances
