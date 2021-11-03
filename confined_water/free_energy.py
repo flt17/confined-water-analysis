@@ -415,7 +415,9 @@ def _compute_distribution_for_system_with_one_periodic_direction(
 
     # start by separating solid atoms from liquid atoms
     solid_atoms = universe.select_atoms("not name O H")
-    liquid_atoms = universe.select_atoms(f"name {species}")
+    # liquid_atoms = universe.select_atoms(f"name {species}")
+    selected_atoms = universe.select_atoms(f"name {species}")
+    oxygen_atoms = universe.select_atoms(f"name O")
 
     # this will serve as our anchor for translation for computing the free energy profile
     anchor_coordinates = solid_atoms.center_of_mass()
@@ -440,6 +442,13 @@ def _compute_distribution_for_system_with_one_periodic_direction(
     solid_coord2_all = []
 
     number_of_samples = len(np.arange(start_frame, end_frame, frame_frequency))
+
+    # define solid bins for getting z-dependent COM
+    bins_COM_solid = np.arange(0,topology.get_cell_lengths_and_angles()[2]+3,3)
+
+    # based on bins get atom groups forming each bin
+    # solid_z_resolved = [solid_atoms[(np.where((solid_atoms.positions[:,2] > bins_COM_solid[count]) & (solid_atoms.positions[:,2] <= bins_COM_solid[count+1])))] for count in np.arange(len(bins_COM_solid)-1)]
+
     # Loop over trajectory
     for count_frames, frames in enumerate(
         tqdm((universe.trajectory[start_frame:end_frame])[::frame_frequency])
@@ -494,52 +503,166 @@ def _compute_distribution_for_system_with_one_periodic_direction(
         # wrap atoms in box
         universe.atoms.pack_into_box(box=topology.get_cell_lengths_and_angles(), inplace=True)
 
-        # define center of mass of solid now
         solid_COM = solid_atoms.center_of_mass()
 
+        #####################################################
+        # Having prepared the positions now we have to find:
+        # 1. The water molecules within the contact layer
+        # 2. Their projection on the surface by taking into account the tube's breathing modes
+
+        # get vectors water molecules (here oxygens) to closest solid neighbor
+        vectors_oxygens_to_solid = (
+                solid_atoms.positions[np.newaxis, :]
+                - oxygen_atoms.positions[:, np.newaxis]
+            )
+
+        # apply MIC for all oxygen-oxygen pairs
+        vectors_oxygens_to_solid_MIC = (
+                utils.apply_minimum_image_convention_to_interatomic_vectors(
+                    vectors_oxygens_to_solid, topology.cell,"z"
+                )
+            )
+
+        # get minimum distances based on vectors
+        min_distances_oxygens_to_solid = np.min(
+                np.linalg.norm(vectors_oxygens_to_solid_MIC, axis=2), axis=1
+            )
+
+        # get resids of water molecules inside contact layer
+        # resids_water_contact = oxygen_atoms[np.where(min_distances_oxygens_to_solid < spatial_extent_contact_layer)].resids
+        resids_water_contact = "resid " + (" ").join([str(resid) for resid in oxygen_atoms[np.where(min_distances_oxygens_to_solid < spatial_extent_contact_layer)].resids])
+
+        # get the respective atoms of the species chosen O/H
+        selected_atoms_contact = selected_atoms.select_atoms(resids_water_contact)
+
+        # the projection is done in two parts:
+        # a. for each water molecule compute z center of mass of the tube based on finite displacements
+        # b. We then need to find the solid atom closest which will then serve as radius
+
+        # based on bins get atom groups forming each bin
+        solid_z_resolved = ([solid_atoms[(np.where((solid_atoms.positions[:,2] > bins_COM_solid[count]) & (solid_atoms.positions[:,2] <= bins_COM_solid[count+1])))] for count in np.arange(len(bins_COM_solid)-1)])
+        indices_digitized_liquid= np.digitize(selected_atoms_contact.positions[:,2],bins_COM_solid,right=True)-1
+
+        # get the COM for each z-segment and create array to subtract from positions
+        COMs_z_resolved = np.asarray([atom_group.center_of_mass() for atom_group in solid_z_resolved])
+
+        # now get the vectors from the respective center to the atom, we only take the inplane part
+        # this is enough to get the angle but we need to correct radius to project it to     
+        vectors_COM_z_selected_contact = (
+                selected_atoms_contact.positions
+                - COMs_z_resolved[indices_digitized_liquid]
+            )[:,not_pbc_indices]
+
+        # vectors_COM_z_selected_contact = (
+        #         selected_atoms_contact.positions
+        #         - solid_COM
+        #     )[:,not_pbc_indices]
+
+        # to get the right radius we have to find the atom which lies on the vector from the COMz to 
+        # the selected atom. To do so, we calculate the angle between the elongated vector and the
+        # vector to all solid atoms in the z-segment. For now just, use the atom which is closest as radius
+        # get vectors chosen atoms to closest solid neighbor
+        # vectors_selected_to_solid = (
+        #         solid_atoms.positions[np.newaxis, :]
+        #         - selected_atoms_contact.positions[:, np.newaxis]
+        #     )
+
+        # # apply MIC for all oxygen-oxygen pairs
+        # vectors_selected_to_solid_MIC = (
+        #         utils.apply_minimum_image_convention_to_interatomic_vectors(
+        #             vectors_selected_to_solid, topology.cell,"z"
+        #         )
+        #     )
+
+        # # get minimum distances based on vectors
+        # min_distances_selected_to_solid = np.min(
+        #         np.linalg.norm(vectors_selected_to_solid_MIC, axis=2), axis=1
+        #     )
+
+        # atom_dependent_radius = np.linalg.norm(vectors_COM_z_selected_contact,axis=1)+min_distances_selected_to_solid
+
         # now compute vector from liquid atoms from the center axis of the solid
-        vector_liquid_to_central_axis = liquid_atoms.positions - solid_COM
+        # vector_liquid_to_central_axis = liquid_atoms.positions - solid_COM
+
+        # get vectors between each liquid atom and all solid atoms
+        # vectors_liquid_to_solid = (
+        #         solid_atoms.positions[np.newaxis, :]
+        #         - liquid_atoms.positions[:, np.newaxis]
+        #     )
+
+        # # apply MIC for all oxygen-oxygen pairs
+        # vectors_liquid_to_solid_MIC = (
+        #     utils.apply_minimum_image_convention_to_interatomic_vectors(
+        #             vectors_liquid_to_solid, topology.cell, "z"
+        #         )
+        #     )
+
+        # # get minimum distances based on vectors
+        # min_distances_liquid_to_solid = np.min(
+        #         np.linalg.norm(vectors_liquid_to_solid_MIC, axis=2), axis=1
+        #     )
+
+        # liquid_atoms_in_contact_positions = liquid_atoms[
+        #     np.where(min_distances_liquid_to_solid <= spatial_extent_contact_layer)
+        # ].positions[:, pbc_indices]
 
         # only choose those atoms which are within contact layer from solid
-        liquid_atoms_in_contact_positions = vector_liquid_to_central_axis[
-            np.where(
-                np.linalg.norm(vector_liquid_to_central_axis[:, not_pbc_indices], axis=1)
-                >= spatial_extent_contact_layer
-            )
-        ]
+        # liquid_atoms_in_contact_positions = vector_liquid_to_central_axis[
+        #     np.where(
+        #         np.linalg.norm(vector_liquid_to_central_axis[:, not_pbc_indices], axis=1)
+        #         >= spatial_extent_contact_layer
+        #     )
+        # ]
 
         # for chosen atoms compute position in periodic and angular direction
         # periodic is easy
         liquid_contact_coord2 = np.append(
             liquid_contact_coord2,
-            liquid_atoms_in_contact_positions[:, pbc_indices] + solid_COM[pbc_indices],
+            selected_atoms_contact.positions[:,2],
         )
 
         # the angular coordinate is a bit more tricky
         # start by computing angle from axis
         angles_liquid_contact_central_axis = np.arctan2(
-            liquid_atoms_in_contact_positions[:, not_pbc_indices[1]],
-            liquid_atoms_in_contact_positions[:, not_pbc_indices[0]],
+            vectors_COM_z_selected_contact[:, not_pbc_indices[1]],
+            vectors_COM_z_selected_contact[:, not_pbc_indices[0]],
         )
 
         # compute expansion on opened tube (adding pi to get only positive values)
         angular_component_liquid_contact = (
-            tube_circumference * (angles_liquid_contact_central_axis + np.pi) / (2 * np.pi)
+            tube_radius * (angles_liquid_contact_central_axis + np.pi)
         )
         liquid_contact_coord1 = np.append(liquid_contact_coord1, angular_component_liquid_contact)
 
         # do the same thing for solid
-        vector_solid_to_central_axis = solid_atoms.positions - solid_COM
+        indices_digitized_solid= np.digitize(solid_atoms.positions[:,2],bins_COM_solid,right=True)-1
+    
+        vectors_COM_z_solid = (
+                solid_atoms.positions
+                - COMs_z_resolved[indices_digitized_solid]
+            )[:,not_pbc_indices]
+
+        # vectors_COM_z_solid = (
+        #         solid_atoms.positions
+        #         - solid_COM
+        #     )[:,not_pbc_indices]
+
+        
         solid_coord2 = np.append(solid_coord2, solid_atoms.positions[:, pbc_indices])
 
         angles_solid_central_axis = np.arctan2(
-            vector_solid_to_central_axis[:, not_pbc_indices[1]],
-            vector_solid_to_central_axis[:, not_pbc_indices[0]],
+            vectors_COM_z_solid[:, not_pbc_indices[1]],
+            vectors_COM_z_solid[:, not_pbc_indices[0]],
         )
 
+        # angular_component_solid = (
+        #     np.linalg.norm(vectors_COM_z_solid,axis=1) * (angles_solid_central_axis + np.pi) 
+        # )
+
         angular_component_solid = (
-            tube_circumference * (angles_solid_central_axis + np.pi) / (2 * np.pi)
+            tube_radius * (angles_solid_central_axis + np.pi) 
         )
+
 
         solid_coord1 = np.append(solid_coord1, angular_component_solid)
 
