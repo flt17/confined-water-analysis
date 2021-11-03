@@ -2476,8 +2476,8 @@ class Simulation:
 
         # compute spatial extent of contact layer
         # spatial_extent_contact_layer = self.get_water_contact_layer_on_interface()
-        spatial_extent_contact_layer = self.get_water_contact_layer_on_interface_from_shortest_OX() # now from shortest OX 
-
+        # spatial_extent_contact_layer = self.get_water_contact_layer_on_interface_from_shortest_OX() # now from shortest OX 
+        spatial_extent_contact_layer = 4.8
 
         # compute average tube radius if tube
         if len(pbc_dimensions_indices) == 1:
