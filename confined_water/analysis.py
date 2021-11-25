@@ -2018,10 +2018,13 @@ class Simulation:
         # determine in which direction the summed force will be correlated
         summed_force_all_directions = self.summed_forces[:, direction_index]
 
+        # determine the part of the data you want to loop about
+        summed_force_all_directions_production = (summed_force_all_directions[start_frame:end_frame])[::frame_frequency]
+
         # Loop over summed forces in the desired direction
         for frame, summed_forces_per_frame in enumerate(
             tqdm(
-                (summed_force_all_directions[start_frame:end_frame])[::frame_frequency]
+                summed_force_all_directions_production
             )
         ):
 
@@ -2038,8 +2041,8 @@ class Simulation:
 
             # compute autocorrelation of summed force per frame, for now for each direction separately
             autocorrelation_total_summed_forces_per_frame = np.sum(
-                summed_force_all_directions[frame]
-                * summed_force_all_directions[frame:last_correlation_frame],
+                summed_force_all_directions_production[frame]
+                * summed_force_all_directions_production[frame:last_correlation_frame],
                 axis=1,
             )
 
