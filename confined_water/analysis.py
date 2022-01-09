@@ -2441,6 +2441,8 @@ class Simulation:
         end_time: int = None,
         frame_frequency: int = None,
         frame_frequency_radius: int = None,
+        parallel: bool = False,
+        number_of_cores: int = 4,
     ):
         """
         Compute the free energy profile of water on top of solid surface.
@@ -2449,8 +2451,9 @@ class Simulation:
             end_time (int) : End time for analysis (optional).
             frame_frequency (int): Take every nth frame only (optional).
             frame_frequency_radius (int): Take every nth frame only for computing radius(optional).
+            parallel (bool): Whether to compute the free energy profile in parallel.
+            number_of_cores (int): If parallel==True, this sets the number of cores used.
         Returns:
-            surface_area_solid_phase (float): Surface area of the solid phase in A^2.
         """
 
         # get information about sampling
@@ -2512,6 +2515,8 @@ class Simulation:
                 frame_frequency,
                 self.tube_radius,
                 tube_length_in_unit_cells,
+                parallel,
+                number_of_cores
             )
 
         # save as attribute of the class instance
