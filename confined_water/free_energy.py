@@ -795,7 +795,7 @@ def _compute_distribution_for_system_with_one_periodic_direction_in_parallel(
     job_list = [dask.delayed(_sample_distribution_for_systems_with_one_periodic_direction_per_frame(frame,
                                         universe,topology,solid_atoms, selected_atoms, oxygen_atoms,anchor_coordinates,
                                         indices_atoms_anchor_rotation,pbc_indices, spatial_extent_contact_layer,tube_radius)) for frame in
-                                         np.arange(start_frame, end_frame + frame_frequency, frame_frequency)]
+                                         tqdm(np.arange(start_frame, end_frame + frame_frequency, frame_frequency))]
     # Loop over trajectory
     # job_list = []
     # for count_frames, frames in enumerate(
