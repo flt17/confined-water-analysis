@@ -789,7 +789,7 @@ def _compute_distribution_for_system_with_one_periodic_direction_in_parallel(
     start_frame_per_proc = np.array([block[0] for block in frames_per_proc])
     end_frame_per_proc = np.append(start_frame_per_proc[1::]-1, np.array(end_frame))
 
-    dask.config.set(scheduler='processes', pool=ThreadPool(number_of_cores))
+    dask.config.set(scheduler='processes')
 
     job_list = []
     # Loop over trajectory
@@ -820,7 +820,7 @@ def _compute_distribution_for_system_with_one_periodic_direction_in_parallel(
                             # for proc_id in np.arange(number_of_cores))
 
     #     test = np.concatenate(coords)
-    result = dask.compute(job_list)
+    result = dask.compute(job_list,num_workers=number_of_cores)
 
     liquid_contact_2d = np.concatenate(pd.DataFrame(result[0])[0])
     solid_2d = np.concatenate(pd.DataFrame(result[0])[1])
