@@ -74,7 +74,7 @@ class TestComputeAtomicProbabilities:
             tube_radius=tube_radius,
             tube_length_in_unit_cells=6,
             parallel=True,
-            number_of_cores=4
+            number_of_cores=2
         )
 
     def test_returns_probabilities_for_sheet(self):

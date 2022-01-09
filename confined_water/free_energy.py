@@ -348,8 +348,8 @@ def compute_spatial_distribution_of_atoms_on_interface(
             )
 
         if parallel == True:
-
-            # compute probabilities for tube
+            
+	    # compute probabilities for tube
             liquid, solid = _compute_distribution_for_system_with_one_periodic_direction_in_parallel(
                 position_universe,
                 topology,
@@ -790,15 +790,20 @@ def _compute_distribution_for_system_with_one_periodic_direction_in_parallel(
     end_frame_per_proc = np.append(start_frame_per_proc[1::]-1, np.array(end_frame))
 
     dask.config.set(scheduler='processes')
-
-    job_list = []
+    # breakpoint()
+    # job_list = [dask.delayed(_sample_distribution_for_systems_with_one_periodic_direction_per_frame(frames.frame,
+    #                                     universe,topology,solid_atoms, selected_atoms, oxygen_atoms,anchor_coordinates,
+    #                                     indices_atoms_anchor_rotation,pbc_indices, spatial_extent_contact_layer,tube_radius) for frames in
+    #                                      ((universe.trajectory[start_frame:end_frame])[::frame_frequency]))]
     # Loop over trajectory
+    job_list = []
     for count_frames, frames in enumerate(
         tqdm((universe.trajectory[start_frame:end_frame])[::frame_frequency])
     ): 
 
         job_list.append(dask.delayed(_sample_distribution_for_systems_with_one_periodic_direction_per_frame(frames.frame,
-                                        universe,topology,solid_atoms, selected_atoms, oxygen_atoms,anchor_coordinates,indices_atoms_anchor_rotation,pbc_indices, spatial_extent_contact_layer,tube_radius)))
+                                        universe,topology,solid_atoms, selected_atoms, oxygen_atoms,anchor_coordinates,
+                                        indices_atoms_anchor_rotation,pbc_indices, spatial_extent_contact_layer,tube_radius)))
 
     
     # # having identified the required frames we can now distribute these over the processors
@@ -821,7 +826,7 @@ def _compute_distribution_for_system_with_one_periodic_direction_in_parallel(
 
     #     test = np.concatenate(coords)
     result = dask.compute(job_list,num_workers=number_of_cores)
-
+    breakpoint()
     liquid_contact_2d = np.concatenate(pd.DataFrame(result[0])[0])
     solid_2d = np.concatenate(pd.DataFrame(result[0])[1])
     return liquid_contact_2d, solid_2d
