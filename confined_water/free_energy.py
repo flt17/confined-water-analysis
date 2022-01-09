@@ -13,7 +13,7 @@ from confined_water import analysis
 
 import dask
 import dask.multiprocessing
-from multiprocessing.pool import ThreadPool
+from multiprocessing.pool import Pool
 
 
 
@@ -789,21 +789,22 @@ def _compute_distribution_for_system_with_one_periodic_direction_in_parallel(
     start_frame_per_proc = np.array([block[0] for block in frames_per_proc])
     end_frame_per_proc = np.append(start_frame_per_proc[1::]-1, np.array(end_frame))
 
-    dask.config.set(scheduler='processes')
-    # breakpoint()
-    # job_list = [dask.delayed(_sample_distribution_for_systems_with_one_periodic_direction_per_frame(frames.frame,
-    #                                     universe,topology,solid_atoms, selected_atoms, oxygen_atoms,anchor_coordinates,
-    #                                     indices_atoms_anchor_rotation,pbc_indices, spatial_extent_contact_layer,tube_radius) for frames in
-    #                                      ((universe.trajectory[start_frame:end_frame])[::frame_frequency]))]
-    # Loop over trajectory
-    job_list = []
-    for count_frames, frames in enumerate(
-        tqdm((universe.trajectory[start_frame:end_frame])[::frame_frequency])
-    ): 
-
-        job_list.append(dask.delayed(_sample_distribution_for_systems_with_one_periodic_direction_per_frame(frames.frame,
+    dask.config.set(scheduler='processes', pool=Pool(number_of_cores))
+    
+    frames_all = np.arange(start_frame, end_frame + frame_frequency, frame_frequency) 
+    job_list = [dask.delayed(_sample_distribution_for_systems_with_one_periodic_direction_per_frame(frame,
                                         universe,topology,solid_atoms, selected_atoms, oxygen_atoms,anchor_coordinates,
-                                        indices_atoms_anchor_rotation,pbc_indices, spatial_extent_contact_layer,tube_radius)))
+                                        indices_atoms_anchor_rotation,pbc_indices, spatial_extent_contact_layer,tube_radius)) for frame in
+                                         np.arange(start_frame, end_frame + frame_frequency, frame_frequency)]
+    # Loop over trajectory
+    # job_list = []
+    # for count_frames, frames in enumerate(
+    #     tqdm((universe.trajectory[start_frame:end_frame])[::frame_frequency])
+    # ): 
+
+    #     job_list.append(dask.delayed(_sample_distribution_for_systems_with_one_periodic_direction_per_frame(frames.frame,
+    #                                     universe,topology,solid_atoms, selected_atoms, oxygen_atoms,anchor_coordinates,
+    #                                     indices_atoms_anchor_rotation,pbc_indices, spatial_extent_contact_layer,tube_radius)))
 
     
     # # having identified the required frames we can now distribute these over the processors
