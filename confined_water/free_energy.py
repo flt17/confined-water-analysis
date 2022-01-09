@@ -443,8 +443,8 @@ def _compute_distribution_for_system_with_one_periodic_direction(
 
     number_of_samples = len(np.arange(start_frame, end_frame, frame_frequency))
 
-    # define solid bins for getting z-dependent COM
-    bins_COM_solid = np.arange(0,topology.get_cell_lengths_and_angles()[2]+3,3)
+    # define solid bins for getting z-dependent COM, add a little bit more for numerical reasons
+    bins_COM_solid = np.linspace(0, simulation.topology.get_cell_lengths_and_angles()[2]+1e-3, 7)
 
     # based on bins get atom groups forming each bin
     # solid_z_resolved = [solid_atoms[(np.where((solid_atoms.positions[:,2] > bins_COM_solid[count]) & (solid_atoms.positions[:,2] <= bins_COM_solid[count+1])))] for count in np.arange(len(bins_COM_solid)-1)]
