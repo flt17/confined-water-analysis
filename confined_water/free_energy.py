@@ -789,48 +789,117 @@ def _compute_distribution_for_system_with_one_periodic_direction_in_parallel(
     start_frame_per_proc = np.array([block[0] for block in frames_per_proc])
     end_frame_per_proc = np.append(start_frame_per_proc[1::]-1, np.array(end_frame))
 
-    dask.config.set(scheduler='processes', pool=Pool(number_of_cores))
+    tmp_universe = universe
+
+    #------------------------------------
+    # dask
+    #------------------------------------
+    # dask.config.set(scheduler='processes', pool=Pool(number_of_cores))
     
-    frames_all = np.arange(start_frame, end_frame + frame_frequency, frame_frequency) 
-    job_list = [dask.delayed(_sample_distribution_for_systems_with_one_periodic_direction_per_frame(frame,
-                                        universe,topology,solid_atoms, selected_atoms, oxygen_atoms,anchor_coordinates,
-                                        indices_atoms_anchor_rotation,pbc_indices, spatial_extent_contact_layer,tube_radius)) for frame in
-                                         tqdm(np.arange(start_frame, end_frame + frame_frequency, frame_frequency))]
-    # Loop over trajectory
-    # job_list = []
+    # frames_all = np.arange(start_frame, end_frame + frame_frequency, frame_frequency) 
+    # job_list = [dask.delayed(_sample_distribution_for_systems_with_one_periodic_direction_per_frame(frame,
+    #                                     universe,topology,solid_atoms, selected_atoms, oxygen_atoms,anchor_coordinates,
+    #                                     indices_atoms_anchor_rotation,pbc_indices, spatial_extent_contact_layer,tube_radius)) for frame in
+    #                                      tqdm(np.arange(start_frame, end_frame + frame_frequency, frame_frequency))]
+
+    # result = dask.compute(job_list,num_workers=number_of_cores)
+
+    #------------------------------------
+    # joblib
+    #------------------------------------
+
+    # now we loop over the chunks, these will be computed in parallel
+    with Parallel(n_jobs=number_of_cores, verbose=20, backend="loky") as parallel:
+        liquid, solid = parallel(delayed(_sample_distribution_for_systems_with_one_periodic_direction_per_processor)(
+            tmp_universe,start_frame_per_proc[proc_id], end_frame_per_proc[proc_id], frame_frequency) 
+        for proc_id in np.arange(number_of_cores))
+
+
+    breakpoint()
+    # liquid_contact_2d = np.concatenate(pd.DataFrame(result[0])[0])
+    # solid_2d = np.concatenate(pd.DataFrame(result[0])[1])
+    # return liquid_contact_2d, solid_2d
+
+def _sample_distribution_for_systems_with_one_periodic_direction_per_processor(
+    universe,
+    # topology,
+    # spatial_extent_contact_layer: float,
+    # anchor_coordinates,
+    # indices_atoms_anchor_rotation,
+    # tube_radius: float,
+    # tube_length_in_unit_cells: int,
+    # pbc_indices,
+    # species,
+    start_frame: int,
+    end_frame: int,
+    frame_frequency: int):
+    """
+    Compute distribution of atomic positions for 1D systems (for parallelism).
+    Arguments:
+        universe : MDAnalysis universes to be analysed.
+        topology : ASE atoms object containing information about topology.
+        anchor_coordinates: Reference coordinartes of the solid.
+        indices_atoms_anchor_rotation: Atomic indices forming the reference rotation axis.
+        spatial_extent_contact_layer (float): How far ranges the water contact layer.
+        tube_radius (float) : radius of the tube in A.
+        tube_length_in_unit_cells (int): multiples of tube unit cell in periodic direction.
+        pbc_indices : Direction indices in which system is periodic
+        species : Element to perform analysis with.
+        start_frame (int) : Start frame for analysis.
+        end_frame (int) : End frame for analysis.
+        frame_frequency (int): Take every nth frame only.
+    """
+
+    return start_frame, end_frame
+
+    # define dimensions not periodic, indices
+    # not_pbc_indices = list(set(pbc_indices) ^ set([0, 1, 2]))
+    # periodic_vector = np.zeros(3)
+    # periodic_vector[pbc_indices] = 1
+
+    # universe.trajectory[start_frame]
+
+    # # repeat separating solid atoms from liquid atoms
+    # solid_atoms = universe.select_atoms("not name O H")
+    # selected_atoms = universe.select_atoms(f"name {species}")
+    # oxygen_atoms = universe.select_atoms(f"name O")
+
+    # # define arrays where the coordinates of oxygens and solid atoms will be saved in
+    # liquid_contact_coord1 = []
+    # liquid_contact_coord2 = []
+    # solid_coord1 = []
+    # solid_coord2 = []
+
+    # liquid_contact_coord1_all = []
+    # liquid_contact_coord2_all = []
+    # solid_coord1_all = []
+    # solid_coord2_all = []
+
+    # number_of_samples = len(np.arange(start_frame, end_frame, frame_frequency))
+
+    # solid_COM_all = []
+    
+    # # define solid bins for getting z-dependent COM, add a little bit more for numerical reasons
+    # bins_COM_solid = np.linspace(0, topology.get_cell_lengths_and_angles()[2]+1e-3, 7)
+    
+    # # Loop over trajectory
     # for count_frames, frames in enumerate(
     #     tqdm((universe.trajectory[start_frame:end_frame])[::frame_frequency])
-    # ): 
+    # ):  
+    #     # raw_positions = copy.deepcopy(universe.atoms.positions)
+    #     solid_COM = solid_atoms.center_of_mass()
 
-    #     job_list.append(dask.delayed(_sample_distribution_for_systems_with_one_periodic_direction_per_frame(frames.frame,
-    #                                     universe,topology,solid_atoms, selected_atoms, oxygen_atoms,anchor_coordinates,
-    #                                     indices_atoms_anchor_rotation,pbc_indices, spatial_extent_contact_layer,tube_radius)))
+    #     # we start by making the frames translationally and rotationally invariant
+    #     # 1. Translations
+    #     # This is done by computing the translation and substracting it
+    #     translation_from_frame0 = solid_COM - anchor_coordinates
+    #     universe.atoms.positions -= translation_from_frame0
+    #     # translated_positions = raw_positions - translation_from_frame0
 
-    
-    # # having identified the required frames we can now distribute these over the processors
-    # with Parallel(n_jobs=number_of_cores, verbose= 20, backend="multiprocessing") as parallel:
-    #     coords = parallel(
-    #                 delayed(_sample_distribution_for_systems_with_one_periodic_direction_per_processor2)(
-                            # universe,
-                            # # topology,
-                            # # spatial_extent_contact_layer,
-                            # anchor_coordinates,
-                            # # indices_atoms_anchor_rotation,
-                            # # tube_radius,
-                            # # tube_length_in_unit_cells,
-                            # # pbc_indices,
-                            # # species,
-                            # start_frame_per_proc[proc_id],
-                            # end_frame_per_proc[proc_id],
-                            # frame_frequency)
-                            # for proc_id in np.arange(number_of_cores))
+    #     # solid_COM_all.append(raw_positions[50])
 
-    #     test = np.concatenate(coords)
-    result = dask.compute(job_list,num_workers=number_of_cores)
-    breakpoint()
-    liquid_contact_2d = np.concatenate(pd.DataFrame(result[0])[0])
-    solid_2d = np.concatenate(pd.DataFrame(result[0])[1])
-    return liquid_contact_2d, solid_2d
+    #     # cleaned_positions = _clean_coords(raw_positions, solid_atoms,anchor_coordinates, topology)
+    #     solid_COM_all.append(universe.atoms.positions[200])
 
 
 def _sample_distribution_for_systems_with_one_periodic_direction_per_frame(
@@ -1013,7 +1082,7 @@ def _sample_distribution_for_systems_with_one_periodic_direction_per_frame(
     return liquid_contact_2d, solid_2d
 
 
-def _sample_distribution_for_systems_with_one_periodic_direction_per_processor(
+def _sample_distribution_for_systems_with_one_periodic_direction_per_processor2(
     universe,
     topology,
     spatial_extent_contact_layer: float,
