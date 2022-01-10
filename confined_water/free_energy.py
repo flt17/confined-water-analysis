@@ -945,10 +945,9 @@ def _sample_distribution_for_systems_with_one_periodic_direction_per_processor(
 
     number_of_samples = len(np.arange(start_frame, end_frame, frame_frequency))
 
-    solid_COM_all = []
 
     # define solid bins for getting z-dependent COM, add a little bit more for numerical reasons
-    bins_COM_solid = np.linspace(0, topology.get_cell_lengths_and_angles()[2]+1e-3, 7)
+    #bins_COM_solid = np.linspace(0, topology.get_cell_lengths_and_angles()[2]+1e-3, 7)
 
     # Loop over trajectory
     for count_frames, frames in enumerate(
@@ -999,7 +998,8 @@ def _sample_distribution_for_systems_with_one_periodic_direction_per_processor(
 
         # wrap atoms in box
         universe.atoms.pack_into_box(box=topology.get_cell_lengths_and_angles(), inplace=True)
-        
+        solid_COM = solid_atoms.center_of_mass()
+
         #####################################################
         # Having prepared the positions now we have to find:
         # 1. The water molecules within the contact layer
@@ -1032,22 +1032,21 @@ def _sample_distribution_for_systems_with_one_periodic_direction_per_processor(
 
         # for each water molecule compute z center of mass of the tube based on finite displacements
         # based on bins get atom groups forming each bin
-        solid_z_resolved = ([solid_atoms[(np.where((solid_atoms.positions[:,2] > bins_COM_solid[count]) & (solid_atoms.positions[:,2] <= bins_COM_solid[count+1])))] for count in np.arange(len(bins_COM_solid)-1)])
-        indices_digitized_liquid= np.digitize(selected_atoms_contact.positions[:,2],bins_COM_solid,right=True)-1
+        #solid_z_resolved = ([solid_atoms[(np.where((solid_atoms.positions[:,2] > bins_COM_solid[count]) & (solid_atoms.positions[:,2] <= bins_COM_solid[count+1])))] for count in np.arange(len(bins_COM_solid)-1)])
+        #indices_digitized_liquid= np.digitize(selected_atoms_contact.positions[:,2],bins_COM_solid,right=True)-1
 
         # get the COM for each z-segment and create array to subtract from positions
         COMs_z_resolved = np.asarray([atom_group.center_of_mass() for atom_group in solid_z_resolved])
 
-        if np.max(indices_digitized_liquid)>5:
-            breakpoint()
-
         # now get the vectors from the respective center to the atom, we only take the inplane part
         # this is enough to get the angle but we need to correct radius to project it to
-        vectors_COM_z_selected_contact = (
-                selected_atoms_contact.positions
-                - COMs_z_resolved[indices_digitized_liquid]
-            )[:,not_pbc_indices]
-
+        #vectors_COM_z_selected_contact = (
+        #        selected_atoms_contact.positions
+        #        - COMs_z_resolved[indices_digitized_liquid]
+        #    )[:,not_pbc_indices]
+        
+        vectors_COM_z_selected_contact = (selected_atoms_contact.positions-
+                solid_COM)[:,not_pbc_indices]
 
         # for chosen atoms compute position in periodic and angular direction
         # periodic is easy
