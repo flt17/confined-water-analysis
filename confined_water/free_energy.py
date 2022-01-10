@@ -1069,12 +1069,15 @@ def _sample_distribution_for_systems_with_one_periodic_direction_per_processor(
         liquid_contact_coord1 = np.append(liquid_contact_coord1, angular_component_liquid_contact)
 
         # do the same thing for solid
-        indices_digitized_solid= np.digitize(solid_atoms.positions[:,2],bins_COM_solid,right=True)-1
+        #indices_digitized_solid= np.digitize(solid_atoms.positions[:,2],bins_COM_solid,right=True)-1
 
+        #vectors_COM_z_solid = (
+        #        solid_atoms.positions
+        #        - COMs_z_resolved[indices_digitized_solid]
+        #    )[:,not_pbc_indices]
         vectors_COM_z_solid = (
-                solid_atoms.positions
-                - COMs_z_resolved[indices_digitized_solid]
-            )[:,not_pbc_indices]
+        solid_atoms.positions - solid_COM
+        )[:, not_pbc_indices]
 
         solid_coord2 = np.append(solid_coord2, solid_atoms.positions[:, pbc_indices])
 
