@@ -2437,6 +2437,8 @@ class Simulation:
         self,
         tube_length_in_unit_cells: int = None,
         species: str = "O",
+        fixed_contact_layer: bool = True,
+        contact_layer_dimension: float = 4.8,
         start_time: int = None,
         end_time: int = None,
         frame_frequency: int = None,
@@ -2450,6 +2452,8 @@ class Simulation:
             start_time (int) : Start time for analysis (optional).
             end_time (int) : End time for analysis (optional).
             frame_frequency (int): Take every nth frame only (optional).
+            fixed_contact_layer (bool): Use a fixed contact layer. If false, the CL will be determined from the O-X distribution.
+            contact_layer_dimension (float): Fixed extension of the CL.
             frame_frequency_radius (int): Take every nth frame only for computing radius(optional).
             parallel (bool): Whether to compute the free energy profile in parallel.
             number_of_cores (int): If parallel==True, this sets the number of cores used.
@@ -2479,11 +2483,14 @@ class Simulation:
         pbc_dimensions_indices = global_variables.DIMENSION_DICTIONARY.get(
             self.pbc_dimensions
         )
-
+        
+        
         # compute spatial extent of contact layer
         # spatial_extent_contact_layer = self.get_water_contact_layer_on_interface()
-        # spatial_extent_contact_layer = self.get_water_contact_layer_on_interface_from_shortest_OX() # now from shortest OX 
-        spatial_extent_contact_layer = 4.8
+        if fixed_contact_layer:
+            spatial_extent_contact_layer = contact_layer_dimension
+        else:
+            spatial_extent_contact_layer = self.get_water_contact_layer_on_interface_from_shortest_OX() # now from shortest OX 
 
         # compute average tube radius if tube
         if len(pbc_dimensions_indices) == 1:
