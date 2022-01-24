@@ -305,12 +305,12 @@ class Simulation:
             )
 
             # check if multiple files found, then we need to distinguish further:
-            if len(total_summed_force_files) > 1:
+            #if len(total_summed_force_files) > 1:
                 # refine selection taking only correct files (ending on -1.dat):
                 # this might be changed when CP2K is updated
-                total_summed_force_files = [
-                    file for file in total_summed_force_files if "-1.dat" in file
-                ]
+                #total_summed_force_files = [
+                #    file for file in total_summed_force_files if "-1.dat" in file
+                #]
 
             # read in summed forces with pandas, if multiple files, they are averaged immediately
             self.summed_forces = np.mean(
