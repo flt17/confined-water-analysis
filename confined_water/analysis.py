@@ -2565,6 +2565,7 @@ class Simulation:
 
     def compute_distribution_shortest_O_X_distance(
         self,
+        solid_types: str = "C B N", 
         bin_width: float = 0.1,
         start_time: int = None,
         end_time: int = None,
@@ -2574,6 +2575,7 @@ class Simulation:
         Compute the distribution of the shortest distances between oxygen atoms and the solid atoms. This instantaneous treatment
         allows to properly determine the contact layer irrespective of the breathing modes of the solid.
         Arguments:
+            solid_types (str) : Solid types to be used as X.
             bin_width (float) : Bin width for histogram, default 0.1 A.
             start_time (int) : Start time for analysis (optional).
             end_time (int) : End time for analysis (optional).
@@ -2600,7 +2602,7 @@ class Simulation:
 
         # define atom groups and array for saving distances
         oxygen_atoms = tmp_position_universe.select_atoms("name O")
-        solid_atoms = tmp_position_universe.select_atoms("name C B N")
+        solid_atoms = tmp_position_universe.select_atoms(f"name {solid_types}")
         min_distances_oxygens_to_solid = np.zeros(
             (
                 len(
@@ -2611,7 +2613,6 @@ class Simulation:
                 len(oxygen_atoms),
             )
         )
-
         # loop over trajectory
         for count_frames, frames in enumerate(
             tqdm(

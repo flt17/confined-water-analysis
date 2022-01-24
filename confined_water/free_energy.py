@@ -386,17 +386,34 @@ def compute_spatial_distribution_of_atoms_on_interface(
         n_coords = 2
 
     else:
+        
+        if parallel == False:
         # compute probabilities for flat interface
-        liquid, solid = _compute_distribution_for_system_with_two_periodic_directions(
-            position_universe,
-            topology,
-            spatial_extent_contact_layer,
-            pbc_indices,
-            species,
-            start_frame,
-            end_frame,
-            frame_frequency,
-        )
+            liquid, solid = _compute_distribution_for_system_with_two_periodic_directions(
+                position_universe,
+               topology,
+               spatial_extent_contact_layer,
+               pbc_indices,
+               species,
+               start_frame,
+               end_frame,
+               frame_frequency,
+            )
+        else:
+            (
+                liquid,
+                solid,
+            ) = _compute_distribution_for_system_with_two_periodic_directions_in_parallel(
+                position_universe,
+                topology,
+                spatial_extent_contact_layer,
+                pbc_indices,
+                species,
+                start_frame,
+                end_frame,
+                frame_frequency,
+                number_of_cores,
+            )
 
         n_coords = 3
 
@@ -828,9 +845,6 @@ def _compute_distribution_for_system_with_one_periodic_direction_in_parallel(
 
     number_of_samples = len(np.arange(start_frame, end_frame, frame_frequency))
 
-    # define solid bins for getting z-dependent COM, add a little bit more for numerical reasons
-    bins_COM_solid = np.linspace(0, topology.get_cell_lengths_and_angles()[2] + 1e-3, 7)
-
     # up to here, everything is like in the serial version
     # now we need to split the trajectory into chunks
     # the number of chunks corresponds to the number of cores used
@@ -1028,21 +1042,6 @@ def _sample_distribution_for_systems_with_one_periodic_direction_per_processor(
         # get the respective atoms of the species chosen O/H
         selected_atoms_contact = selected_atoms.select_atoms(resids_water_contact)
 
-        # for each water molecule compute z center of mass of the tube based on finite displacements
-        # based on bins get atom groups forming each bin
-        #solid_z_resolved = ([solid_atoms[(np.where((solid_atoms.positions[:,2] > bins_COM_solid[count]) & (solid_atoms.positions[:,2] <= bins_COM_solid[count+1])))] for count in np.arange(len(bins_COM_solid)-1)])
-        #indices_digitized_liquid= np.digitize(selected_atoms_contact.positions[:,2],bins_COM_solid,right=True)-1
-
-        # get the COM for each z-segment and create array to subtract from positions
-        #COMs_z_resolved = np.asarray([atom_group.center_of_mass() for atom_group in solid_z_resolved])
-
-        # now get the vectors from the respective center to the atom, we only take the inplane part
-        # this is enough to get the angle but we need to correct radius to project it to
-        #vectors_COM_z_selected_contact = (
-        #        selected_atoms_contact.positions
-        #        - COMs_z_resolved[indices_digitized_liquid]
-        #    )[:,not_pbc_indices]
-        
         vectors_COM_z_selected_contact = (selected_atoms_contact.positions-
                 solid_COM)[:,not_pbc_indices]
 
@@ -1107,6 +1106,212 @@ def _sample_distribution_for_systems_with_one_periodic_direction_per_processor(
     return liquid_contact_2d, solid_2d
 
 
+def _compute_distribution_for_system_with_two_periodic_directions_in_parallel(
+    universe,
+    topology,
+    spatial_extent_contact_layer: float,
+    pbc_indices,
+    species,
+    start_frame: int,
+    end_frame: int,
+    frame_frequency: int,
+    number_of_cores: int,
+):
+    """
+    Compute distribution of atomic positions for 1D systems.
+    Arguments:
+        universe : MDAnalysis universes to be analysed.
+        topology : ASE atoms object containing information about topology.
+        spatial_extent_contact_layer (float): How far ranges the water contact layer.
+        pbc_indices : Direction indices in which system is periodic
+        species : Element to perform analysis with.
+        start_frame (int) : Start frame for analysis.
+        end_frame (int) : End frame for analysis.
+        frame_frequency (int): Take every nth frame only.
+        number_of_cores (int): Number of processors the analysis runs on.
+    """
+
+    not_pbc_indices = list(set(pbc_indices) ^ set([0, 1, 2]))
+    periodic_vector = np.zeros(3)
+    periodic_vector[pbc_indices] = 1
+
+    # rewind trajectory
+    universe.trajectory[0]
+
+    # start by separating solid atoms from liquid atoms
+    solid_atoms = universe.select_atoms("not name O H")
+    # liquid_atoms = universe.select_atoms(f"name {species}")
+    selected_atoms = universe.select_atoms(f"name {species}")
+    oxygen_atoms = universe.select_atoms(f"name O")
+    
+    # this will serve as our anchor for computing the free energy profile
+    anchor_coordinates = solid_atoms.center_of_mass()
+
+    number_of_samples = len(np.arange(start_frame, end_frame, frame_frequency))
+
+    # up to here, everything is like in the serial version
+    # now we need to split the trajectory into chunks
+    # the number of chunks corresponds to the number of cores used
+
+    # get the frames treated on every processor
+    frames_per_proc = np.array_split(
+        np.arange(start_frame, end_frame + frame_frequency, frame_frequency),
+        number_of_cores,
+    )
+    # get initial and end frame per proc
+    start_frame_per_proc = np.array([block[0] for block in frames_per_proc])
+    start_frame_per_proc[1::] -= frame_frequency
+    end_frame_per_proc = np.append(start_frame_per_proc[1::], np.array(end_frame))
+
+    # ------------------------------------
+    # joblib
+    # ------------------------------------
+    # now we loop over the chunks, these will be computed in parallel
+    with Parallel(n_jobs=number_of_cores, verbose=1, backend="loky") as parallel:
+        data = parallel(
+            delayed(
+                _sample_distribution_for_systems_with_two_periodic_directions_per_processor
+            )(
+                universe,
+                topology,
+                spatial_extent_contact_layer,
+                anchor_coordinates,
+                pbc_indices,
+                species,
+                start_frame_per_proc[proc_id],
+                end_frame_per_proc[proc_id],
+                frame_frequency,
+            )
+            for proc_id in np.arange(len(start_frame_per_proc))
+        )
+    liquid = np.concatenate([data[i][0] for i in np.arange(len(data))])
+    solid = np.concatenate([data[i][1] for i in np.arange(len(data))])
+
+    return liquid, solid
+
+def _sample_distribution_for_systems_with_two_periodic_directions_per_processor(
+    universe,
+    topology,
+    spatial_extent_contact_layer: float,
+    anchor_coordinates,
+    pbc_indices,
+    species,
+    start_frame: int,
+    end_frame: int,
+    frame_frequency: int,
+):
+    """
+    Compute distribution of atomic positions for 1D systems (for parallelism).
+    Arguments:
+        universe : MDAnalysis universes to be analysed.
+        topology : ASE atoms object containing information about topology.
+        anchor_coordinates: Reference coordinartes of the solid.
+        indices_atoms_anchor_rotation: Atomic indices forming the reference rotation axis.
+        spatial_extent_contact_layer (float): How far ranges the water contact layer.
+        tube_radius (float) : radius of the tube in A.
+        tube_length_in_unit_cells (int): multiples of tube unit cell in periodic direction.
+        pbc_indices : Direction indices in which system is periodic
+        species : Element to perform analysis with.
+        start_frame (int) : Start frame for analysis.
+        end_frame (int) : End frame for analysis.
+        frame_frequency (int): Take every nth frame only.
+    """
+
+
+    # define dimensions not periodic, indices
+    not_pbc_indices = list(set(pbc_indices) ^ set([0, 1, 2]))
+    periodic_vector = np.zeros(3)
+    periodic_vector[pbc_indices] = 1
+
+    universe.trajectory[start_frame]
+
+    # repeat separating solid atoms from liquid atoms
+    solid_atoms = universe.select_atoms("not name O H")
+    selected_atoms = universe.select_atoms(f"name {species}")
+    oxygen_atoms = universe.select_atoms(f"name O")
+
+    # define arrays where the coordinates of oxygens and solid atoms will be saved in
+    liquid_contact_coord1 = []
+    liquid_contact_coord2 = []
+    solid_all = []
+
+    liquid_contact_coord1_all = []
+    liquid_contact_coord2_all = []
+    solid_all_all = []
+
+    number_of_samples = len(np.arange(start_frame, end_frame, frame_frequency))
+
+    # Loop over trajectory
+    for count_frames, frames in enumerate(
+         tqdm((universe.trajectory[start_frame:end_frame])[::frame_frequency])
+     ):
+        translation_from_frame0 = solid_atoms.center_of_mass() - anchor_coordinates
+        universe.atoms.positions -= translation_from_frame0
+
+        # wrap atoms in box
+        universe.atoms.pack_into_box(
+            box=topology.get_cell_lengths_and_angles(), inplace=True
+        )
+        
+        # get vectors water molecules (here oxygens) to closest solid neighbor
+        vectors_oxygens_to_solid = (
+                solid_atoms.positions[np.newaxis, :]
+                - oxygen_atoms.positions[:, np.newaxis]
+            )
+
+        # apply MIC for all oxygen-oxygen pairs
+        vectors_oxygens_to_solid_MIC = (
+                utils.apply_minimum_image_convention_to_interatomic_vectors(
+                    vectors_oxygens_to_solid, topology.cell,"xy"
+                )
+            )
+
+        # get minimum distances based on vectors
+        min_distances_oxygens_to_solid = np.min(
+                np.linalg.norm(vectors_oxygens_to_solid_MIC, axis=2), axis=1
+            )
+
+        
+        # get resids of water molecules inside contact layer
+        # resids_water_contact = oxygen_atoms[np.where(min_distances_oxygens_to_solid < spatial_extent_contact_layer)].resids
+        resids_water_contact = "resid " + (" ").join([str(resid) for resid in oxygen_atoms[np.where(min_distances_oxygens_to_solid < spatial_extent_contact_layer)].resids])
+
+        # get the respective atoms of the species chosen O/H
+        selected_atoms_contact = selected_atoms.select_atoms(resids_water_contact)
+
+        # save liquid
+        liquid_contact_coord1 = np.append(
+            liquid_contact_coord1, selected_atoms_contact.positions[:, pbc_indices[0]]
+        )
+
+        liquid_contact_coord2 = np.append(
+            liquid_contact_coord2, selected_atoms_contact.positions[:, pbc_indices[1]]
+        )
+
+        # save solid
+        solid_all = np.append(solid_all, solid_atoms.positions)
+    
+        # making code more efficient, ugly but useful
+        if count_frames % 1000 == 0 or count_frames == number_of_samples - 1:
+
+            # save full arrays to global array and empty local to free memory and speed up loop
+            liquid_contact_coord1_all = np.append(
+                liquid_contact_coord1_all, liquid_contact_coord1
+            )
+            liquid_contact_coord1 = []
+            liquid_contact_coord2_all = np.append(
+                liquid_contact_coord2_all, liquid_contact_coord2
+            )
+            liquid_contact_coord2 = []
+            solid_all_all = np.append(solid_all_all, solid_all)
+            solid_all = []
+
+    # put coords of liquid together
+    liquid_contact_2d = np.column_stack(
+        (liquid_contact_coord1_all, liquid_contact_coord2_all)
+    )
+
+    return liquid_contact_2d, (solid_all_all)
 def _compute_distribution_for_system_with_two_periodic_directions(
     universe,
     topology,
