@@ -2197,9 +2197,9 @@ class Simulation:
 
         else:
             # in case we have a tube start we need to compute the radius first
-
-            tube_radius = self.compute_tube_radius(
-                pbc_dimensions_indices, start_time, end_time, frame_frequency
+            if tube_radius == 0:
+                tube_radius = self.compute_tube_radius(
+                    pbc_dimensions_indices, start_time, end_time, frame_frequency
             )
             # return surface area: 2*pi*circumference*length
             return (
