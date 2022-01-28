@@ -2197,15 +2197,15 @@ class Simulation:
 
         else:
             # in case we have a tube start we need to compute the radius first
-            if tube_radius == 0:
-                tube_radius = self.compute_tube_radius(
+            if self.tube_radius == 0:
+                self.tube_radius = self.compute_tube_radius(
                     pbc_dimensions_indices, start_time, end_time, frame_frequency
             )
             # return surface area: 2*pi*circumference*length
             return (
                 2
                 * np.pi
-                * tube_radius
+                * self.tube_radius
                 * self.topology.get_cell_lengths_and_angles()[pbc_dimensions_indices]
             )
 
